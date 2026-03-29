@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MFL Squad Organiser</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-primary: #0a0e13;
+  --bg-secondary: #111820;
+  --bg-tertiary: #1a2230;
+  --bg-card: #151d28;
+  --bg-hover: #1e2a3a;
+  --bg-pitch: #1a5c2a;
+  --border: #2a3545;
+  --border-light: #3a4858;
+  --text-primary: #e8ecf1;
+  --text-secondary: #8899aa;
+  --text-muted: #5a6a7a;
+  --accent: #169fed;
+  --accent-glow: rgba(22, 159, 237, 0.15);
+  --green: #3af24b;
+  --yellow: #ffcc00;
+  --orange: #ff9900;
+  --red: #ff0000;
+  --pink: #fa53ff;
+  --loan-accent: #ff6b35;
+  --loan-glow: rgba(255, 107, 53, 0.2);
+  --oop-color: #ff4444;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#uploadScreen {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; padding: 40px 20px;
+}
+.upload-title { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.5px; }
+.upload-subtitle { color: var(--text-secondary); margin-bottom: 40px; font-size: 14px; }
+.upload-zones { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 30px; }
+.upload-zone { width: 220px; height: 160px; border: 2px dashed var(--border-light); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: var(--bg-secondary); position: relative; }
+.upload-zone:hover { border-color: var(--accent); background: var(--accent-glow); }
+.upload-zone.loaded { border-color: var(--green); border-style: solid; }
+.upload-zone-label { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+.upload-zone-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.upload-zone-icon { font-size: 32px; color: var(--text-muted); }
+.upload-zone.loaded .upload-zone-icon { color: var(--green); }
+.upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+#btnLaunch { font-family: 'JetBrains Mono', monospace; padding: 12px 40px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: all 0.2s; }
+#btnLaunch.ready { opacity: 1; pointer-events: all; }
+#btnLaunch.ready:hover { background: #1ab0ff; transform: translateY(-1px); }
+.upload-or { color: var(--text-muted); font-size: 13px; margin: 15px 0; }
+#btnLoadSave { font-family: 'JetBrains Mono', monospace; padding: 10px 30px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; margin-bottom: 15px; }
+#btnLoadSave:hover { border-color: var(--accent); color: var(--accent); }
+
+#appScreen { display: none; }
+.app-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+.app-logo { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: var(--accent); }
+.header-actions { display: flex; gap: 10px; align-items: center; }
+.btn { font-family: 'DM Sans', sans-serif; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-light); background: var(--bg-tertiary); color: var(--text-primary); transition: all 0.15s; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-accent:hover { background: #1ab0ff; color: #fff; }
+
+.pool-summary { padding: 8px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.pool-row { display: flex; gap: 0; align-items: center; flex-wrap: nowrap; margin-bottom: 3px; }
+.pool-row:last-child { margin-bottom: 0; }
+.pool-section-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 2px 12px 2px 0; white-space: nowrap; min-width: 75px; }
+.pool-item { display: flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.pool-item-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-secondary); }
+.pool-item-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text-primary); min-width: 18px; text-align: center; }
+
+.main-layout { display: flex; height: calc(100vh - 115px); }
+.squad-nav { width: 220px; min-width: 220px; background: var(--bg-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.squad-nav-header { padding: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.squad-nav-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+.btn-add-squad { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); color: #fff; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.btn-add-squad:hover { background: #1ab0ff; }
+.squad-list { flex: 1; overflow-y: auto; padding: 6px; }
+.squad-list-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; transition: background 0.1s; margin-bottom: 2px; }
+.squad-list-item:hover { background: var(--bg-hover); }
+.squad-list-item.active { background: var(--accent-glow); border: 1px solid rgba(22, 159, 237, 0.3); }
+.squad-list-item .squad-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.squad-delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 4px; opacity: 0; transition: opacity 0.1s; }
+.squad-list-item:hover .squad-delete-btn { opacity: 1; }
+.squad-delete-btn:hover { color: var(--red); }
+
+.squad-view { flex: 1; overflow-y: auto; padding: 20px; }
+.squad-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.squad-name-input { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600; background: transparent; border: none; color: var(--text-primary); outline: none; border-bottom: 2px solid transparent; padding: 4px 0; transition: border-color 0.2s; width: 300px; }
+.squad-name-input:focus { border-bottom-color: var(--accent); }
+.squad-actions { display: flex; gap: 8px; margin-left: auto; }
+
+.formations-row { display: flex; gap: 20px; margin-bottom: 16px; }
+.formation-section { flex: 1; min-width: 0; }
+.formation-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.formation-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+.formation-select { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 6px; padding: 5px 10px; cursor: pointer; outline: none; }
+.formation-select:focus { border-color: var(--accent); }
+
+.pitch-container { position: relative; width: 100%; aspect-ratio: 68 / 90; background: var(--bg-pitch); border-radius: 10px; overflow: hidden; border: 2px solid #2a6a38; }
+.pitch-markings { position: absolute; inset: 0; pointer-events: none; }
+.pitch-markings svg { width: 100%; height: 100%; }
+.pitch-slot { position: absolute; transform: translate(-50%, -50%); width: 72px; text-align: center; cursor: pointer; z-index: 2; }
+.pitch-slot.dragging { opacity: 0.4; z-index: 10; }
+.pitch-slot.drag-over .pitch-slot-card { border-color: var(--accent) !important; box-shadow: 0 0 12px var(--accent-glow); }
+.pitch-slot-card { background: rgba(10, 14, 19, 0.85); border: 1px solid var(--border-light); border-radius: 6px; padding: 4px 6px; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.15s; position: relative; }
+.pitch-slot-card:hover { border-color: var(--accent); background: rgba(10, 14, 19, 0.95); }
+.pitch-slot-card.empty { border-style: dashed; opacity: 0.6; }
+.pitch-slot-card.loan { border-color: var(--loan-accent); box-shadow: 0 0 8px var(--loan-glow); }
+.pitch-slot-card.oop { border-color: var(--oop-color); border-width: 2px; }
+.pitch-slot-pos { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+.pitch-slot-name { font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68px; }
+.pitch-slot-ovr { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+.pitch-slot-retire { font-size: 9px; margin-top: 1px; }
+.pitch-slot-remove { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); color: #fff; font-size: 10px; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
+.pitch-slot-card:hover .pitch-slot-remove { display: flex; }
+.oop-badge { font-family: 'JetBrains Mono', monospace; font-size: 7px; font-weight: 700; color: var(--oop-color); letter-spacing: 0.5px; }
+.loan-badge { font-family: 'JetBrains Mono', monospace; font-size: 7px; font-weight: 700; color: var(--loan-accent); letter-spacing: 0.5px; }
+
+.squad-player-list { margin-top: 16px; }
+.squad-player-list-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.squad-player-entry { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
+.squad-player-entry:hover { background: var(--bg-hover); }
+.squad-player-entry .sp-ovr { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; width: 28px; text-align: center; }
+.squad-player-entry .sp-name { flex: 1; }
+.squad-player-entry .sp-pos { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.squad-player-entry.loan-entry { color: var(--loan-accent); }
+.copied-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.copied-toast.show { opacity: 1; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-title { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0 4px; }
+.modal-close:hover { color: var(--text-primary); }
+.modal-filters { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filter-input { font-family: 'DM Sans', sans-serif; background: var(--bg-tertiary); border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; width: 160px; }
+.filter-input:focus { border-color: var(--accent); }
+.filter-input::placeholder { color: var(--text-muted); }
+.filter-select { font-family: 'DM Sans', sans-serif; background: var(--bg-tertiary); border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px 8px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer; }
+.filter-select:focus { border-color: var(--accent); }
+.filter-small { width: 60px; }
+.filter-label { font-size: 11px; color: var(--text-muted); }
+.modal-body { flex: 1; overflow-y: auto; padding: 0; }
+.player-row { display: flex; align-items: center; padding: 7px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; font-size: 13px; gap: 6px; }
+.player-row:hover { background: var(--bg-hover); }
+.pr-ovr { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; width: 30px; text-align: center; }
+.pr-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-pos { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); width: 90px; }
+.pr-stats { font-family: 'JetBrains Mono', monospace; font-size: 10px; display: flex; gap: 2px; }
+.pr-stat { width: 24px; text-align: center; border-radius: 2px; padding: 1px 0; }
+.pr-retire { width: 20px; text-align: center; font-size: 13px; }
+.pr-age { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); width: 26px; text-align: center; }
+.pr-nat { font-size: 11px; color: var(--text-secondary); width: 70px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.loan-modal .modal { max-width: 400px; }
+.loan-form { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.loan-form label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.loan-form input, .loan-form select { font-family: 'DM Sans', sans-serif; background: var(--bg-tertiary); border: 1px solid var(--border-light); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+.loan-form input:focus, .loan-form select:focus { border-color: var(--accent); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+.no-squad-msg { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="uploadScreen">
+  <div class="upload-title">MFL Squad Organiser</div>
+  <div class="upload-subtitle">Upload your 3 MFL player data files to get started</div>
+  <div class="upload-zones">
+    <div class="upload-zone" id="zone1"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 1</div><div class="upload-zone-desc">Profile view</div><input type="file" accept=".txt,.html,.htm" data-file="1"></div>
+    <div class="upload-zone" id="zone2"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 2</div><div class="upload-zone-desc">Stats view (P/D/P/S/D/P)</div><input type="file" accept=".txt,.html,.htm" data-file="2"></div>
+    <div class="upload-zone" id="zone3"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 3</div><div class="upload-zone-desc">Positional OVRs</div><input type="file" accept=".txt,.html,.htm" data-file="3"></div>
+  </div>
+  <button id="btnLaunch">Launch Squad Organiser</button>
+  <div class="upload-or">— or —</div>
+  <button id="btnLoadSave">Load Saved Session</button>
+  <input type="file" id="loadSaveInput" accept=".json" style="display:none">
+  <div style="margin-top:30px;color:var(--text-muted);font-size:11px;">Built by <span style="color:var(--accent)">ricky_hyde</span> on Discord for feedback & suggestions</div>
+</div>
+
+<div id="appScreen">
+  <div class="app-header">
+    <div class="app-logo">MFL Squad Organiser</div>
+    <div class="header-actions">
+      <button class="btn" onclick="exportSession()">Export Save</button>
+      <button class="btn" onclick="importSession()">Import Save</button>
+      <button class="btn" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+  <div class="pool-summary" id="poolSummary"></div>
+  <div class="main-layout">
+    <div class="squad-nav">
+      <div class="squad-nav-header"><div class="squad-nav-title">Squads</div><button class="btn-add-squad" onclick="addSquad()" title="Add squad">+</button></div>
+      <div class="squad-list" id="squadList"></div>
+    </div>
+    <div class="squad-view" id="squadView">
+      <div class="no-squad-msg" id="noSquadMsg">Select or create a squad to get started</div>
+      <div id="squadContent" style="display:none">
+        <div class="squad-header">
+          <input class="squad-name-input" id="squadNameInput" placeholder="Squad Name" maxlength="40">
+          <div class="squad-actions">
+            <button class="btn btn-accent" onclick="openAddPlayerModal('starters')">Add Player</button>
+            <button class="btn" style="border-color:var(--loan-accent);color:var(--loan-accent);" onclick="openLoanModal()">Add Loan</button>
+          </div>
+        </div>
+        <div class="formations-row">
+          <div class="formation-section">
+            <div class="formation-header"><div class="formation-label">Starters</div><select class="formation-select" id="startersFormation" onchange="updateFormation('starters')"></select></div>
+            <div class="pitch-container" id="startersPitch"><div class="pitch-markings"><svg viewBox="0 0 680 900" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="660" height="880" stroke="#2a7a3a" stroke-width="2" fill="none" rx="4"/><line x1="10" y1="450" x2="670" y2="450" stroke="#2a7a3a" stroke-width="2"/><circle cx="340" cy="450" r="73" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="450" r="3" fill="#2a7a3a"/><rect x="178" y="10" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/><rect x="238" y="10" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="108" r="3" fill="#2a7a3a"/><rect x="178" y="758" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/><rect x="238" y="838" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="792" r="3" fill="#2a7a3a"/><path d="M 258 10 A 73 73 0 0 0 422 10" stroke="#2a7a3a" stroke-width="2" fill="none"/><path d="M 258 890 A 73 73 0 0 1 422 890" stroke="#2a7a3a" stroke-width="2" fill="none"/></svg></div></div>
+          </div>
+          <div class="formation-section">
+            <div class="formation-header"><div class="formation-label">Backups</div><select class="formation-select" id="backupsFormation" onchange="updateFormation('backups')"></select></div>
+            <div class="pitch-container" id="backupsPitch"><div class="pitch-markings"><svg viewBox="0 0 680 900" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="660" height="880" stroke="#2a7a3a" stroke-width="2" fill="none" rx="4"/><line x1="10" y1="450" x2="670" y2="450" stroke="#2a7a3a" stroke-width="2"/><circle cx="340" cy="450" r="73" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="450" r="3" fill="#2a7a3a"/><rect x="178" y="10" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/><rect x="238" y="10" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="108" r="3" fill="#2a7a3a"/><rect x="178" y="758" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/><rect x="238" y="838" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/><circle cx="340" cy="792" r="3" fill="#2a7a3a"/><path d="M 258 10 A 73 73 0 0 0 422 10" stroke="#2a7a3a" stroke-width="2" fill="none"/><path d="M 258 890 A 73 73 0 0 1 422 890" stroke="#2a7a3a" stroke-width="2" fill="none"/></svg></div></div>
+          </div>
+        </div>
+        <div class="squad-player-list" id="squadPlayerList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addPlayerModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Add Player <span id="modalSlotInfo" style="font-size:12px;color:var(--text-secondary)"></span></div><button class="modal-close" onclick="closeAddPlayerModal()">&times;</button></div>
+    <div class="modal-filters">
+      <input class="filter-input" id="filterName" placeholder="Search name..." oninput="applyFilters()">
+      <select class="filter-select" id="filterPos" onchange="applyFilters()"><option value="">All Positions</option></select>
+      <label class="filter-label">OVR</label>
+      <input class="filter-input filter-small" id="filterOvrMin" type="number" placeholder="Min" oninput="applyFilters()">
+      <input class="filter-input filter-small" id="filterOvrMax" type="number" placeholder="Max" oninput="applyFilters()">
+      <label class="filter-label">Age</label>
+      <input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" oninput="applyFilters()">
+      <input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" oninput="applyFilters()">
+    </div>
+    <div class="modal-body" id="playerListBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay loan-modal" id="loanModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Add Loan Player</div><button class="modal-close" onclick="closeLoanModal()">&times;</button></div>
+    <div class="loan-form">
+      <label>Player Name</label><input type="text" id="loanName" placeholder="e.g. Kevin Joseph">
+      <label>OVR</label><input type="number" id="loanOvr" placeholder="e.g. 73" min="1" max="99">
+      <label>Position</label><select id="loanPos"></select>
+      <label>Assign To</label><select id="loanTarget"><option value="starters">Starters</option><option value="backups">Backups</option></select>
+      <label>Slot</label><select id="loanSlot"></select>
+      <button class="btn btn-accent" style="margin-top:8px;" onclick="confirmLoan()">Add Loan Player</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importInput" accept=".json" style="display:none">
+<div class="copied-toast" id="copiedToast">Copied!</div>
+
+<script>
+let allPlayers=[], squads=[], activeSquadId=null, addPlayerTarget='starters', addPlayerSlotIdx=null;
+let dragSection=null, dragIdx=null;
+
+const POSITION_ORDER=['GK','RB','RWB','CB','LB','LWB','CDM','RM','CM','LM','CAM','RW','CF','LW','ST'];
+const OVR_BANDS=[[85,99,'85+'],[75,84,'75-84'],[65,74,'65-74'],[55,64,'55-64'],[45,54,'45-54'],[35,44,'35-44'],[30,34,'30-34'],[0,29,'0-29']];
+
+const FORMATIONS={
+'3-4-2-1':{positions:['ST','CAM','CAM','LM','CM','CM','RM','CB','CB','CB','GK'],coords:[[50,10],[35,25],[65,25],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]},
+'3-4-3':{positions:['LW','ST','RW','LM','CM','CM','RM','CB','CB','CB','GK'],coords:[[20,10],[50,10],[80,10],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]},
+'3-4-3 (diamond)':{positions:['LW','ST','RW','LM','CAM','CDM','RM','CB','CB','CB','GK'],coords:[[20,10],[50,10],[80,10],[12,42],[50,35],[50,55],[88,42],[30,72],[50,72],[70,72],[50,90]]},
+'3-5-2':{positions:['ST','ST','LM','CM','CDM','CM','RM','CB','CB','CB','GK'],coords:[[35,10],[65,10],[12,32],[35,38],[50,50],[65,38],[88,32],[30,72],[50,72],[70,72],[50,90]]},
+'3-5-2 (B)':{positions:['ST','ST','CAM','LM','CDM','CDM','RM','CB','CB','CB','GK'],coords:[[35,10],[65,10],[50,25],[12,38],[38,50],[62,50],[88,38],[30,72],[50,72],[70,72],[50,90]]},
+'4-1-2-1-2':{positions:['ST','ST','CAM','LM','RM','CDM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[50,27],[22,40],[78,40],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-1-2-1-2 (narrow)':{positions:['ST','ST','CAM','CM','CM','CDM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[50,27],[35,40],[65,40],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-1-3-2':{positions:['ST','ST','LM','CM','RM','CDM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[22,32],[50,35],[78,32],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-1-4-1':{positions:['ST','LM','CM','CM','RM','CDM','LB','CB','CB','RB','GK'],coords:[[50,10],[15,30],[38,35],[62,35],[85,30],[50,52],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-2-2-2':{positions:['ST','ST','CAM','CAM','CDM','CDM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[30,30],[70,30],[38,52],[62,52],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-2-3-1':{positions:['ST','LW','CAM','RW','CDM','CDM','LB','CB','CB','RB','GK'],coords:[[50,10],[20,25],[50,28],[80,25],[38,50],[62,50],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-2-4':{positions:['LW','ST','ST','RW','CM','CM','LB','CB','CB','RB','GK'],coords:[[15,12],[38,10],[62,10],[85,12],[38,45],[62,45],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-1-2':{positions:['ST','ST','CAM','CM','CM','CM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[50,27],[30,45],[50,50],[70,45],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-2-1':{positions:['ST','CF','CF','CM','CM','CM','LB','CB','CB','RB','GK'],coords:[[50,10],[30,22],[70,22],[30,45],[50,48],[70,45],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-3':{positions:['LW','ST','RW','CM','CM','CM','LB','CB','CB','RB','GK'],coords:[[20,12],[50,10],[80,12],[30,42],[50,45],[70,42],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-3 (att)':{positions:['LW','ST','RW','CM','CAM','CM','LB','CB','CB','RB','GK'],coords:[[20,12],[50,10],[80,12],[25,42],[50,32],[75,42],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-3 (def)':{positions:['LW','ST','RW','CM','CM','CDM','LB','CB','CB','RB','GK'],coords:[[20,12],[50,10],[80,12],[30,38],[70,38],[50,52],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-3-3 (false 9)':{positions:['LW','CF','RW','CM','CM','CDM','LB','CB','CB','RB','GK'],coords:[[20,12],[50,15],[80,12],[30,38],[70,38],[50,52],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-4-1-1':{positions:['ST','CF','LM','CM','CM','RM','LB','CB','CB','RB','GK'],coords:[[50,10],[50,27],[15,42],[38,47],[62,47],[85,42],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-4-2':{positions:['ST','ST','LM','CM','CM','RM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[15,40],[38,45],[62,45],[85,40],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'4-4-2 (B)':{positions:['ST','ST','LM','CDM','CDM','RM','LB','CB','CB','RB','GK'],coords:[[35,10],[65,10],[15,40],[38,48],[62,48],[85,40],[15,72],[38,75],[62,75],[85,72],[50,90]]},
+'5-2-3':{positions:['LW','ST','RW','CM','CM','LWB','CB','CB','CB','RWB','GK'],coords:[[20,12],[50,10],[80,12],[38,38],[62,38],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]},
+'5-3-2':{positions:['ST','ST','CM','LM','RM','LWB','CB','CB','CB','RWB','GK'],coords:[[35,10],[65,10],[50,38],[18,35],[82,35],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]},
+'5-4-1':{positions:['ST','LM','CAM','CDM','RM','LWB','CB','CB','CB','RWB','GK'],coords:[[50,10],[18,32],[50,30],[50,48],[82,32],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]},
+'5-4-1 (flat)':{positions:['ST','LM','CM','CM','RM','LWB','CB','CB','CB','RWB','GK'],coords:[[50,10],[18,36],[38,36],[62,36],[82,36],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]}
+};
+
+function parseFile1(c){const p={};const r=/aria-describedby="popup-(\d+)".*?class="text-truncate w-100">([^<]+)<\/div>.*?flex-basis-40"><div><div style="color:\s*([^"]+);">(\d+)<\/div>.*?flex-basis-120">([^<]+)<\/div>.*?retire in (\w+) season.*?cake2-fill me-1"(?:\s*style="color:\s*([^"]*);")?\s*><\/i>(\d+)<\/div>.*?rulers[^>]*><\/i>(\d+)<\/div>.*?flags\/([^.]+)\.svg/gs;let m;while((m=r.exec(c))!==null){const id=m[1];if(!p[id])p[id]={id,name:m[2].trim(),ovrColor:m[3],ovr:+m[4],positions:m[5].trim(),retireIn:m[6]==='null'?null:+m[6],age:+m[8],height:+m[9],nationality:m[10]};}return p;}
+
+function parseFile2(c){const s={};const blocks=c.split(/(?=aria-describedby="popup-)/);for(const b of blocks){const im=b.match(/popup-(\d+)/);if(!im)continue;const sm=[...b.matchAll(/([PDSP]): <span[^>]*>(\d+)<\/span>/g)];if(sm.length>=6)s[im[1]]={pace:+sm[0][2],defending1:+sm[1][2],passing:+sm[2][2],shooting:+sm[3][2],defending2:+sm[4][2],physical:+sm[5][2]};}return s;}
+
+function parseFile3(c){const p={};const r=/aria-describedby="popup-(\d+)"(.*?)(?=aria-describedby="popup-|$)/gs;let m;while((m=r.exec(c))!==null){const o={};let om;const or=/d-inline-block" style="width: 38px;">([A-Z]+):<\/div><div class="d-inline-block" style="width: 40px;"><span[^>]*>(\d+)<\/span>/g;while((om=or.exec(m[2]))!==null)o[om[1]]=+om[2];if(Object.keys(o).length>0)p[m[1]]=o;}return p;}
+
+function mergeData(f1,f2,f3){const m=[],s=new Set();for(const id of Object.keys(f1)){if(s.has(id))continue;s.add(id);m.push({...f1[id],stats:f2[id]||null,posOvrs:f3[id]||null});}m.sort((a,b)=>b.ovr-a.ovr);return m;}
+
+const uploadedFiles={1:null,2:null,3:null};
+document.querySelectorAll('.upload-zone input[type="file"]').forEach(input=>{input.addEventListener('change',e=>{const fn=e.target.dataset.file,f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{uploadedFiles[fn]=r.result;document.getElementById('zone'+fn).classList.add('loaded');document.getElementById('zone'+fn).querySelector('.upload-zone-icon').textContent='✓';checkReady();};r.readAsText(f);});});
+function checkReady(){document.getElementById('btnLaunch').classList.toggle('ready',!!(uploadedFiles[1]&&uploadedFiles[2]&&uploadedFiles[3]));}
+
+document.getElementById('btnLaunch').addEventListener('click',()=>{if(!uploadedFiles[1]||!uploadedFiles[2]||!uploadedFiles[3])return;try{allPlayers=mergeData(parseFile1(uploadedFiles[1]),parseFile2(uploadedFiles[2]),parseFile3(uploadedFiles[3]));if(!allPlayers.length){alert('No players parsed.');return;}const sv=localStorage.getItem('mfl_squads');if(sv)try{const d=JSON.parse(sv);if(d.playerCount===allPlayers.length){squads=d.squads;activeSquadId=d.activeSquadId;}}catch(e){}launchApp();}catch(e){console.error(e);alert('Error: '+e.message);}});
+document.getElementById('btnLoadSave').addEventListener('click',()=>document.getElementById('loadSaveInput').click());
+document.getElementById('loadSaveInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=d.players;squads=d.squads;activeSquadId=d.activeSquadId||null;launchApp();}catch(e){alert('Invalid save');}};r.readAsText(f);});
+
+function launchApp(){
+  document.getElementById('uploadScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  const fn=Object.keys(FORMATIONS);
+  ['startersFormation','backupsFormation'].forEach(id=>{const s=document.getElementById(id);s.innerHTML='<option value="">-- Select Formation --</option>';fn.forEach(f=>s.innerHTML+=`<option value="${f}">${f}</option>`);});
+  const fp=document.getElementById('filterPos');fp.innerHTML='<option value="">All Positions</option>';POSITION_ORDER.forEach(p=>fp.innerHTML+=`<option value="${p}">${p}</option>`);
+  const lp=document.getElementById('loanPos');lp.innerHTML='';POSITION_ORDER.forEach(p=>lp.innerHTML+=`<option value="${p}">${p}</option>`);
+  renderPoolSummary();renderSquadList();
+  if(activeSquadId&&squads.find(s=>s.id===activeSquadId))selectSquad(activeSquadId);
+  autoSave();
+}
+
+function getAssignedPlayerIds(){const ids=new Set();squads.forEach(sq=>{[...(sq.starters||[]),...(sq.backups||[])].forEach(sl=>{if(sl&&sl.playerId)ids.add(sl.playerId);});});return ids;}
+function getUnassignedPlayers(){const a=getAssignedPlayerIds();return allPlayers.filter(p=>!a.has(p.id));}
+
+function renderPoolSummary(){
+  const u=getUnassignedPlayers(),c=document.getElementById('poolSummary');
+  let h='<div class="pool-row"><div class="pool-section-title">Positions</div>';
+  POSITION_ORDER.forEach(pos=>{const n=u.filter(p=>p.positions.split(',')[0].trim()===pos).length;h+=`<div class="pool-item"><span class="pool-item-label">${pos}</span><span class="pool-item-count">${n}</span></div>`;});
+  h+=`<div class="pool-item" style="margin-left:8px"><span class="pool-item-label">Total</span><span class="pool-item-count" style="color:var(--accent)">${u.length}</span></div></div>`;
+  h+='<div class="pool-row"><div class="pool-section-title">OVR Bands</div>';
+  OVR_BANDS.forEach(([mn,mx,lb])=>{const n=u.filter(p=>p.ovr>=mn&&p.ovr<=mx).length;if(n>0||mn>=30)h+=`<div class="pool-item"><span class="pool-item-label">${lb}</span><span class="pool-item-count">${n}</span></div>`;});
+  h+='</div>';c.innerHTML=h;
+}
+
+function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),startersFormation:'',backupsFormation:'',starters:[],backups:[],loans:[]});renderSquadList();selectSquad(id);autoSave();}
+function deleteSquad(id){if(!confirm('Delete this squad?'))return;squads=squads.filter(s=>s.id!==id);if(activeSquadId===id){activeSquadId=null;document.getElementById('squadContent').style.display='none';document.getElementById('noSquadMsg').style.display='flex';}renderSquadList();renderPoolSummary();autoSave();}
+function renderSquadList(){const c=document.getElementById('squadList');c.innerHTML='';squads.forEach(sq=>{const n=(sq.starters||[]).filter(s=>s).length+(sq.backups||[]).filter(s=>s).length+(sq.loans||[]).length;const d=document.createElement('div');d.className='squad-list-item'+(sq.id===activeSquadId?' active':'');d.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(sq.name)}</span><span class="squad-count">${n}</span><button class="squad-delete-btn" onclick="event.stopPropagation();deleteSquad('${sq.id}')">&times;</button>`;d.addEventListener('click',()=>selectSquad(sq.id));c.appendChild(d);});}
+function selectSquad(id){activeSquadId=id;document.getElementById('noSquadMsg').style.display='none';document.getElementById('squadContent').style.display='block';const sq=squads.find(s=>s.id===id);if(!sq)return;document.getElementById('squadNameInput').value=sq.name;document.getElementById('startersFormation').value=sq.startersFormation||'';document.getElementById('backupsFormation').value=sq.backupsFormation||'';renderSquadList();renderPitch('starters');renderPitch('backups');renderSquadPlayerList();}
+document.getElementById('squadNameInput').addEventListener('input',e=>{const sq=squads.find(s=>s.id===activeSquadId);if(sq){sq.name=e.target.value;renderSquadList();autoSave();}});
+
+function updateFormation(section){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const sel=document.getElementById(section+'Formation'),nf=sel.value,of=sq[section+'Formation'];sq[section+'Formation']=nf;if(nf&&nf!==of){const fd=FORMATIONS[nf],os=sq[section]||[],ns=new Array(11).fill(null),used=new Set();fd.positions.forEach((pos,i)=>{for(let j=0;j<os.length;j++){if(!used.has(j)&&os[j]&&os[j].slotPos===pos){ns[i]={...os[j],slotPos:pos};used.add(j);break;}}});sq[section]=ns;}else if(!nf)sq[section]=[];renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
+
+function getPlayerPosOvr(player,slotPos){
+  if(!player||player.isLoan)return{ovr:player?player.ovr:0,isOop:false};
+  const pp=player.positions.split(',').map(s=>s.trim());
+  if(pp[0]===slotPos)return{ovr:player.ovr,isOop:false};
+  if(player.posOvrs&&player.posOvrs[slotPos]!==undefined)return{ovr:player.posOvrs[slotPos],isOop:false};
+  if(pp.includes(slotPos))return{ovr:player.ovr-1,isOop:false};
+  return{ovr:player.ovr,isOop:true};
+}
+
+function renderPitch(section){
+  const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;
+  const container=document.getElementById(section+'Pitch');
+  container.querySelectorAll('.pitch-slot').forEach(el=>el.remove());
+  const formName=sq[section+'Formation'];if(!formName||!FORMATIONS[formName])return;
+  const form=FORMATIONS[formName],slots=sq[section]||[];
+  form.positions.forEach((pos,i)=>{
+    const slot=slots[i],div=document.createElement('div');
+    div.className='pitch-slot';div.style.left=form.coords[i][0]+'%';div.style.top=form.coords[i][1]+'%';
+    div.dataset.section=section;div.dataset.idx=i;
+    if(slot&&(slot.playerId||slot.isLoan)){
+      const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);
+      const{ovr:dOvr,isOop}=getPlayerPosOvr(player,pos);
+      const ovrC=getOvrColor(dOvr),retH=getRetireHtml(slot.isLoan?null:(player?player.retireIn:null)),isL=slot.isLoan;
+      div.draggable=true;
+      div.addEventListener('dragstart',e=>{dragSection=section;dragIdx=i;div.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+      div.addEventListener('dragend',()=>{div.classList.remove('dragging');dragSection=null;dragIdx=null;container.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));});
+      div.innerHTML=`<div class="pitch-slot-card ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}<div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}</div>${retH}<div class="pitch-slot-pos">${pos}</div></div>`;
+    }else{
+      div.innerHTML=`<div class="pitch-slot-card empty" onclick="openAddPlayerForSlot('${section}',${i})"><div class="pitch-slot-pos">${pos}</div></div>`;
+    }
+    div.addEventListener('dragover',e=>{if(dragSection!==section)return;e.preventDefault();e.dataTransfer.dropEffect='move';div.classList.add('drag-over');});
+    div.addEventListener('dragleave',()=>div.classList.remove('drag-over'));
+    div.addEventListener('drop',e=>{e.preventDefault();div.classList.remove('drag-over');if(dragSection!==section||dragIdx===null)return;const ti=+div.dataset.idx;if(dragIdx===ti)return;const sq2=squads.find(s=>s.id===activeSquadId);if(!sq2)return;const arr=sq2[section],tmp=arr[dragIdx];arr[dragIdx]=arr[ti];arr[ti]=tmp;const fd=FORMATIONS[sq2[section+'Formation']];if(arr[dragIdx])arr[dragIdx].slotPos=fd.positions[dragIdx];if(arr[ti])arr[ti].slotPos=fd.positions[ti];renderPitch(section);renderSquadPlayerList();autoSave();});
+    container.appendChild(div);
+  });
+}
+
+function removeFromSlot(section,idx){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const slot=sq[section][idx];if(slot&&slot.isLoan)sq.loans=(sq.loans||[]).filter(l=>l!==slot);sq[section][idx]=null;renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
+
+function openAddPlayerForSlot(section,idx){addPlayerTarget=section;addPlayerSlotIdx=idx;const sq=squads.find(s=>s.id===activeSquadId),fn=sq?sq[section+'Formation']:'',form=FORMATIONS[fn],sp=form?form.positions[idx]:'';document.getElementById('modalSlotInfo').textContent=sp?`→ ${section} ${sp}`:'';openAddPlayerModal(section);}
+function openAddPlayerModal(section){addPlayerTarget=section;if(addPlayerSlotIdx===null)document.getElementById('modalSlotInfo').textContent=`→ ${section}`;document.getElementById('addPlayerModal').classList.add('open');applyFilters();}
+function closeAddPlayerModal(){document.getElementById('addPlayerModal').classList.remove('open');addPlayerSlotIdx=null;}
+
+function applyFilters(){
+  const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=+document.getElementById('filterOvrMin').value||0,oMax=+document.getElementById('filterOvrMax').value||99,aMin=+document.getElementById('filterAgeMin').value||0,aMax=+document.getElementById('filterAgeMax').value||99;
+  const assigned=getAssignedPlayerIds();
+  const avail=allPlayers.filter(p=>{if(assigned.has(p.id))return false;if(nf&&!p.name.toLowerCase().includes(nf))return false;if(pf&&!p.positions.split(',').map(s=>s.trim()).includes(pf))return false;if(p.ovr<oMin||p.ovr>oMax)return false;if(p.age<aMin||p.age>aMax)return false;return true;});
+  const body=document.getElementById('playerListBody');body.innerHTML='';
+  avail.forEach(p=>{
+    const div=document.createElement('div');div.className='player-row';
+    let statsH='';
+    if(p.stats){const s=p.stats,vals=[{l:'P',v:s.pace},{l:'D',v:s.defending1},{l:'P',v:s.passing},{l:'S',v:s.shooting},{l:'D',v:s.defending2},{l:'P',v:s.physical}];statsH='<div class="pr-stats">'+vals.map(x=>`<div class="pr-stat" style="color:${getOvrColor(x.v)}">${x.v}</div>`).join('')+'</div>';}
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${p.positions}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
+  });
+}
+
+function assignPlayer(player){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const section=addPlayerTarget,fn=sq[section+'Formation'];if(!fn){alert('Select a formation first.');return;}const form=FORMATIONS[fn];if(!sq[section])sq[section]=new Array(11).fill(null);if(addPlayerSlotIdx!==null&&!sq[section][addPlayerSlotIdx]){sq[section][addPlayerSlotIdx]={playerId:player.id,slotPos:form.positions[addPlayerSlotIdx]};}else{const ei=sq[section].findIndex(s=>!s);if(ei===-1){alert('All slots filled.');return;}sq[section][ei]={playerId:player.id,slotPos:form.positions[ei]};}addPlayerSlotIdx=null;closeAddPlayerModal();renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
+
+function openLoanModal(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;updateLoanSlots();document.getElementById('loanModal').classList.add('open');}
+function closeLoanModal(){document.getElementById('loanModal').classList.remove('open');}
+function updateLoanSlots(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const t=document.getElementById('loanTarget').value,fn=sq[t+'Formation'],sl=document.getElementById('loanSlot');sl.innerHTML='';if(!fn||!FORMATIONS[fn]){sl.innerHTML='<option value="">Select formation first</option>';return;}const form=FORMATIONS[fn],slots=sq[t]||[];form.positions.forEach((pos,i)=>{if(!slots[i])sl.innerHTML+=`<option value="${i}">${pos} (Slot ${i+1})</option>`;});if(!sl.options.length)sl.innerHTML='<option value="">No empty slots</option>';}
+document.getElementById('loanTarget').addEventListener('change',updateLoanSlots);
+function confirmLoan(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const name=document.getElementById('loanName').value.trim(),ovr=+document.getElementById('loanOvr').value,pos=document.getElementById('loanPos').value,target=document.getElementById('loanTarget').value,si=+document.getElementById('loanSlot').value;if(!name||!ovr||isNaN(si)){alert('Fill in all fields.');return;}const fn=sq[target+'Formation'];if(!fn)return;const form=FORMATIONS[fn];if(!sq[target])sq[target]=new Array(11).fill(null);const ld={isLoan:true,name,ovr,positions:pos,slotPos:form.positions[si]};sq[target][si]=ld;if(!sq.loans)sq.loans=[];sq.loans.push(ld);closeLoanModal();renderPitch(target);renderSquadPlayerList();autoSave();document.getElementById('loanName').value='';document.getElementById('loanOvr').value='';}
+
+function renderSquadPlayerList(){
+  const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;
+  const c=document.getElementById('squadPlayerList');let h='<div class="squad-player-list-title">Squad Players — click name to copy surname</div>';
+  [{key:'starters',label:'Starters'},{key:'backups',label:'Backups'}].forEach(({key,label})=>{
+    const slots=sq[key]||[],filled=slots.filter(s=>s);if(!filled.length)return;
+    h+=`<div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px">${label}</div>`;
+    filled.forEach(slot=>{const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);if(!player)return;const sn=player.name.split(' ').pop(),isL=slot.isLoan,{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
+    h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}</span><span class="sp-pos">${slot.slotPos}</span></div>`;});
+  });c.innerHTML=h;
+}
+
+function copySurname(n){navigator.clipboard.writeText(n).then(()=>{const t=document.getElementById('copiedToast');t.textContent='Copied: '+n;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);});}
+
+function getOvrColor(ovr){if(ovr>=85)return'#fa53ff';if(ovr>=75)return'#169fed';if(ovr>=65)return'#3af24b';if(ovr>=55)return'#ffcc00';return'#9f9f9f';}
+function getRetireHtml(r){if(!r)return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<div class="pitch-slot-retire" style="color:${c[r]||'#fff'}">🎂 ${r}s</div>`;}
+function getRetireIcon(r){if(!r)return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<span style="color:${c[r]}">🎂</span>`;}
+function formatNat(n){if(!n)return'';return n.replace(/_/g,' ').split(' ').map(w=>w.charAt(0)+w.slice(1).toLowerCase()).join(' ');}
+function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+function autoSave(){try{localStorage.setItem('mfl_squads',JSON.stringify({playerCount:allPlayers.length,squads,activeSquadId}));}catch(e){}}
+function exportSession(){const d={version:1,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
+function importSession(){document.getElementById('importInput').click();}
+document.getElementById('importInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=d.players;squads=d.squads;activeSquadId=d.activeSquadId||null;renderPoolSummary();renderSquadList();if(activeSquadId)selectSquad(activeSquadId);autoSave();}catch(e){alert('Invalid save');}};r.readAsText(f);e.target.value='';});
+function resetAll(){if(!confirm('Reset everything?'))return;squads=[];activeSquadId=null;localStorage.removeItem('mfl_squads');document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';uploadedFiles[1]=uploadedFiles[2]=uploadedFiles[3]=null;document.querySelectorAll('.upload-zone').forEach(z=>{z.classList.remove('loaded');z.querySelector('.upload-zone-icon').textContent='📋';});document.querySelectorAll('.upload-zone input').forEach(i=>i.value='');checkReady();}
+</script>
+</body>
+</html>
