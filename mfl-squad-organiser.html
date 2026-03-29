@@ -278,7 +278,7 @@ const POSITION_ORDER=['GK','RB','RWB','CB','LB','LWB','CDM','RM','CM','LM','CAM'
 const OVR_BANDS=[[85,99,'85+'],[75,84,'75-84'],[65,74,'65-74'],[55,64,'55-64'],[45,54,'45-54'],[35,44,'35-44'],[30,34,'30-34'],[0,29,'0-29']];
 
 const FORMATIONS={
-'3-4-2-1':{positions:['ST','CAM','CAM','LM','CM','CM','RM','CB','CB','CB','GK'],coords:[[50,10],[35,25],[65,25],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]},
+'3-4-2-1':{positions:['ST','CF','CF','LM','CM','CM','RM','CB','CB','CB','GK'],coords:[[50,10],[35,25],[65,25],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]},
 '3-4-3':{positions:['LW','ST','RW','LM','CM','CM','RM','CB','CB','CB','GK'],coords:[[20,10],[50,10],[80,10],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]},
 '3-4-3 (diamond)':{positions:['LW','ST','RW','LM','CAM','CDM','RM','CB','CB','CB','GK'],coords:[[20,10],[50,10],[80,10],[12,42],[50,35],[50,55],[88,42],[30,72],[50,72],[70,72],[50,90]]},
 '3-5-2':{positions:['ST','ST','LM','CM','CDM','CM','RM','CB','CB','CB','GK'],coords:[[35,10],[65,10],[12,32],[35,38],[50,50],[65,38],[88,32],[30,72],[50,72],[70,72],[50,90]]},
@@ -393,7 +393,7 @@ function renderPitch(section){
 
 function removeFromSlot(section,idx){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const slot=sq[section][idx];if(slot&&slot.isLoan)sq.loans=(sq.loans||[]).filter(l=>l!==slot);sq[section][idx]=null;renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
 
-function openAddPlayerForSlot(section,idx){addPlayerTarget=section;addPlayerSlotIdx=idx;const sq=squads.find(s=>s.id===activeSquadId),fn=sq?sq[section+'Formation']:'',form=FORMATIONS[fn],sp=form?form.positions[idx]:'';document.getElementById('modalSlotInfo').textContent=sp?`→ ${section} ${sp}`:'';openAddPlayerModal(section);}
+function openAddPlayerForSlot(section,idx){addPlayerTarget=section;addPlayerSlotIdx=idx;const sq=squads.find(s=>s.id===activeSquadId),fn=sq?sq[section+'Formation']:'',form=FORMATIONS[fn],sp=form?form.positions[idx]:'';document.getElementById('modalSlotInfo').textContent=sp?`→ ${section} ${sp}`:'';document.getElementById('filterPos').value=sp||'';openAddPlayerModal(section);}
 function openAddPlayerModal(section){addPlayerTarget=section;if(addPlayerSlotIdx===null)document.getElementById('modalSlotInfo').textContent=`→ ${section}`;document.getElementById('addPlayerModal').classList.add('open');applyFilters();}
 function closeAddPlayerModal(){document.getElementById('addPlayerModal').classList.remove('open');addPlayerSlotIdx=null;}
 
