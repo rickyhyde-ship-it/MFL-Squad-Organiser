@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MFL Squad Organiser</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-primary: #0a0e13;
+  --bg-secondary: #111820;
+  --bg-tertiary: #1a2230;
+  --bg-card: #151d28;
+  --bg-hover: #1e2a3a;
+  --bg-pitch: #1a5c2a;
+  --bg-pitch-light: #2a7a3a;
+  --border: #2a3545;
+  --border-light: #3a4858;
+  --text-primary: #e8ecf1;
+  --text-secondary: #8899aa;
+  --text-muted: #5a6a7a;
+  --accent: #169fed;
+  --accent-glow: rgba(22, 159, 237, 0.15);
+  --green: #3af24b;
+  --yellow: #ffcc00;
+  --orange: #ff9900;
+  --red: #ff0000;
+  --pink: #fa53ff;
+  --loan-accent: #ff6b35;
+  --loan-glow: rgba(255, 107, 53, 0.2);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== UPLOAD SCREEN ===== */
+#uploadScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+
+.upload-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.upload-subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 40px;
+  font-size: 14px;
+}
+
+.upload-zones {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.upload-zone {
+  width: 220px;
+  height: 160px;
+  border: 2px dashed var(--border-light);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.upload-zone:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.upload-zone.loaded {
+  border-color: var(--green);
+  border-style: solid;
+}
+
+.upload-zone-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.upload-zone-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.upload-zone-icon {
+  font-size: 32px;
+  color: var(--text-muted);
+}
+
+.upload-zone.loaded .upload-zone-icon { color: var(--green); }
+
+.upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#btnLaunch {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 12px 40px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.4;
+  pointer-events: none;
+  transition: all 0.2s;
+}
+
+#btnLaunch.ready {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#btnLaunch.ready:hover {
+  background: #1ab0ff;
+  transform: translateY(-1px);
+}
+
+.upload-or {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 15px 0;
+}
+
+#btnLoadSave {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 10px 30px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 15px;
+}
+
+#btnLoadSave:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ===== MAIN APP ===== */
+#appScreen { display: none; }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  font-family: 'DM Sans', sans-serif;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.15s;
+}
+
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-accent:hover { background: #1ab0ff; color: #fff; }
+
+/* ===== POOL SUMMARY BAR ===== */
+.pool-summary {
+  display: flex;
+  gap: 0;
+  padding: 8px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.pool-section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 12px 4px 0;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.pool-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pool-item-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.pool-item-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 18px;
+  text-align: center;
+}
+
+.pool-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 8px;
+  align-self: center;
+}
+
+/* ===== MAIN LAYOUT ===== */
+.main-layout {
+  display: flex;
+  height: calc(100vh - 92px);
+}
+
+/* ===== SQUAD NAV ===== */
+.squad-nav {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.squad-nav-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.squad-nav-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-add-squad {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.btn-add-squad:hover { background: #1ab0ff; }
+
+.squad-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.squad-list-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  transition: background 0.1s;
+  margin-bottom: 2px;
+}
+
+.squad-list-item:hover { background: var(--bg-hover); }
+
+.squad-list-item.active {
+  background: var(--accent-glow);
+  border: 1px solid rgba(22, 159, 237, 0.3);
+}
+
+.squad-list-item .squad-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.squad-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.squad-list-item:hover .squad-delete-btn { opacity: 1; }
+.squad-delete-btn:hover { color: var(--red); }
+
+/* ===== SQUAD VIEW ===== */
+.squad-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.squad-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.squad-name-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  outline: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 0;
+  transition: border-color 0.2s;
+  width: 300px;
+}
+
+.squad-name-input:focus { border-bottom-color: var(--accent); }
+
+.squad-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ===== FORMATION SECTION ===== */
+.formation-section {
+  margin-bottom: 24px;
+}
+
+.formation-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.formation-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.formation-select {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  outline: none;
+}
+
+.formation-select:focus { border-color: var(--accent); }
+
+/* ===== PITCH ===== */
+.pitch-container {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 68 / 90;
+  background: var(--bg-pitch);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid #2a6a38;
+}
+
+.pitch-markings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pitch-markings svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pitch-slot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 72px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.pitch-slot-card {
+  background: rgba(10, 14, 19, 0.85);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 4px 6px;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.pitch-slot-card:hover {
+  border-color: var(--accent);
+  background: rgba(10, 14, 19, 0.95);
+}
+
+.pitch-slot-card.empty {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.pitch-slot-card.loan {
+  border-color: var(--loan-accent);
+  box-shadow: 0 0 8px var(--loan-glow);
+}
+
+.pitch-slot-pos {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.pitch-slot-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 68px;
+}
+
+.pitch-slot-ovr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pitch-slot-retire {
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+.pitch-slot-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  border: none;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.pitch-slot-card:hover .pitch-slot-remove { display: flex; }
+
+.loan-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  font-weight: 700;
+  color: var(--loan-accent);
+  letter-spacing: 0.5px;
+}
+
+/* ===== PLAYER LIST (below pitches) ===== */
+.squad-player-list {
+  margin-top: 20px;
+  max-width: 560px;
+}
+
+.squad-player-list-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.squad-player-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.squad-player-entry:hover { background: var(--bg-hover); }
+
+.squad-player-entry .sp-ovr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  width: 28px;
+  text-align: center;
+}
+
+.squad-player-entry .sp-name { flex: 1; }
+
+.squad-player-entry .sp-pos {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.squad-player-entry .sp-section {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.squad-player-entry.loan-entry { color: var(--loan-accent); }
+
+.copied-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.copied-toast.show { opacity: 1; }
+
+/* ===== ADD PLAYERS MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.modal-close:hover { color: var(--text-primary); }
+
+.modal-filters {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-input {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  width: 160px;
+}
+
+.filter-input:focus { border-color: var(--accent); }
+
+.filter-input::placeholder { color: var(--text-muted); }
+
+.filter-select {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select:focus { border-color: var(--accent); }
+
+.filter-small {
+  width: 60px;
+}
+
+.filter-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.player-row:hover { background: var(--bg-hover); }
+
+.pr-ovr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  width: 30px;
+  text-align: center;
+}
+
+.pr-name { flex: 1; min-width: 0; }
+
+.pr-pos {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 100px;
+}
+
+.pr-retire { width: 20px; text-align: center; font-size: 13px; }
+
+.pr-age {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 30px;
+  text-align: center;
+}
+
+.pr-nat {
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 80px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== LOAN MODAL ===== */
+.loan-modal .modal {
+  max-width: 400px;
+}
+
+.loan-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loan-form label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.loan-form input, .loan-form select {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.loan-form input:focus, .loan-form select:focus { border-color: var(--accent); }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ===== NO SQUAD SELECTED ===== */
+.no-squad-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<!-- ===== UPLOAD SCREEN ===== -->
+<div id="uploadScreen">
+  <div class="upload-title">MFL Squad Organiser</div>
+  <div class="upload-subtitle">Upload your 3 MFL player data files to get started</div>
+  <div class="upload-zones">
+    <div class="upload-zone" id="zone1">
+      <div class="upload-zone-icon">📋</div>
+      <div class="upload-zone-label">File 1</div>
+      <div class="upload-zone-desc">Profile view</div>
+      <input type="file" accept=".txt,.html,.htm" data-file="1">
+    </div>
+    <div class="upload-zone" id="zone2">
+      <div class="upload-zone-icon">📋</div>
+      <div class="upload-zone-label">File 2</div>
+      <div class="upload-zone-desc">Stats view (P/D/P/S/D/P)</div>
+      <input type="file" accept=".txt,.html,.htm" data-file="2">
+    </div>
+    <div class="upload-zone" id="zone3">
+      <div class="upload-zone-icon">📋</div>
+      <div class="upload-zone-label">File 3</div>
+      <div class="upload-zone-desc">Positional OVRs</div>
+      <input type="file" accept=".txt,.html,.htm" data-file="3">
+    </div>
+  </div>
+  <button id="btnLaunch">Launch Squad Organiser</button>
+  <div class="upload-or">— or —</div>
+  <button id="btnLoadSave">Load Saved Session</button>
+  <input type="file" id="loadSaveInput" accept=".json" style="display:none">
+  <div style="margin-top: 30px; color: var(--text-muted); font-size: 11px;">
+    Built by <span style="color: var(--accent)">ricky_hyde</span> on Discord for feedback & suggestions
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="appScreen">
+  <div class="app-header">
+    <div class="app-logo">MFL Squad Organiser</div>
+    <div class="header-actions">
+      <button class="btn" onclick="exportSession()">Export Save</button>
+      <button class="btn" onclick="importSession()">Import Save</button>
+      <button class="btn" onclick="resetAll()">Reset</button>
+    </div>
+  </div>
+
+  <!-- Pool summary bars -->
+  <div class="pool-summary" id="poolSummary"></div>
+
+  <div class="main-layout">
+    <!-- Squad nav sidebar -->
+    <div class="squad-nav">
+      <div class="squad-nav-header">
+        <div class="squad-nav-title">Squads</div>
+        <button class="btn-add-squad" onclick="addSquad()" title="Add squad">+</button>
+      </div>
+      <div class="squad-list" id="squadList"></div>
+    </div>
+
+    <!-- Squad view -->
+    <div class="squad-view" id="squadView">
+      <div class="no-squad-msg" id="noSquadMsg">Select or create a squad to get started</div>
+      <div id="squadContent" style="display:none">
+        <div class="squad-header">
+          <input class="squad-name-input" id="squadNameInput" placeholder="Squad Name" maxlength="40">
+          <div class="squad-actions">
+            <button class="btn btn-accent" onclick="openAddPlayerModal('starters')">Add Player</button>
+            <button class="btn" style="border-color: var(--loan-accent); color: var(--loan-accent);" onclick="openLoanModal()">Add Loan</button>
+          </div>
+        </div>
+
+        <!-- Starters -->
+        <div class="formation-section">
+          <div class="formation-header">
+            <div class="formation-label">Starters</div>
+            <select class="formation-select" id="startersFormation" onchange="updateFormation('starters')"></select>
+          </div>
+          <div class="pitch-container" id="startersPitch">
+            <div class="pitch-markings">
+              <svg viewBox="0 0 680 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="10" width="660" height="880" stroke="#2a7a3a" stroke-width="2" fill="none" rx="4"/>
+                <line x1="10" y1="450" x2="670" y2="450" stroke="#2a7a3a" stroke-width="2"/>
+                <circle cx="340" cy="450" r="73" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="450" r="3" fill="#2a7a3a"/>
+                <rect x="178" y="10" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <rect x="238" y="10" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="108" r="3" fill="#2a7a3a"/>
+                <rect x="178" y="758" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <rect x="238" y="838" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="792" r="3" fill="#2a7a3a"/>
+                <path d="M 258 10 A 73 73 0 0 0 422 10" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 258 890 A 73 73 0 0 1 422 890" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <!-- Corner arcs -->
+                <path d="M 10 20 A 10 10 0 0 0 20 10" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 660 10 A 10 10 0 0 0 670 20" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 10 880 A 10 10 0 0 1 20 890" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 660 890 A 10 10 0 0 1 670 880" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Backups -->
+        <div class="formation-section">
+          <div class="formation-header">
+            <div class="formation-label">Backups</div>
+            <select class="formation-select" id="backupsFormation" onchange="updateFormation('backups')"></select>
+          </div>
+          <div class="pitch-container" id="backupsPitch">
+            <div class="pitch-markings">
+              <svg viewBox="0 0 680 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="10" width="660" height="880" stroke="#2a7a3a" stroke-width="2" fill="none" rx="4"/>
+                <line x1="10" y1="450" x2="670" y2="450" stroke="#2a7a3a" stroke-width="2"/>
+                <circle cx="340" cy="450" r="73" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="450" r="3" fill="#2a7a3a"/>
+                <rect x="178" y="10" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <rect x="238" y="10" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="108" r="3" fill="#2a7a3a"/>
+                <rect x="178" y="758" width="324" height="132" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <rect x="238" y="838" width="204" height="52" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <circle cx="340" cy="792" r="3" fill="#2a7a3a"/>
+                <path d="M 258 10 A 73 73 0 0 0 422 10" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 258 890 A 73 73 0 0 1 422 890" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 10 20 A 10 10 0 0 0 20 10" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 660 10 A 10 10 0 0 0 670 20" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 10 880 A 10 10 0 0 1 20 890" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+                <path d="M 660 890 A 10 10 0 0 1 670 880" stroke="#2a7a3a" stroke-width="2" fill="none"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Squad player list -->
+        <div class="squad-player-list" id="squadPlayerList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Player Modal -->
+<div class="modal-overlay" id="addPlayerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Player</div>
+      <button class="modal-close" onclick="closeAddPlayerModal()">&times;</button>
+    </div>
+    <div class="modal-filters" id="modalFilters">
+      <input class="filter-input" id="filterName" placeholder="Search name..." oninput="applyFilters()">
+      <select class="filter-select" id="filterPos" onchange="applyFilters()">
+        <option value="">All Positions</option>
+      </select>
+      <label class="filter-label">OVR</label>
+      <input class="filter-input filter-small" id="filterOvrMin" type="number" placeholder="Min" oninput="applyFilters()">
+      <input class="filter-input filter-small" id="filterOvrMax" type="number" placeholder="Max" oninput="applyFilters()">
+      <label class="filter-label">Age</label>
+      <input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" oninput="applyFilters()">
+      <input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" oninput="applyFilters()">
+    </div>
+    <div class="modal-body" id="playerListBody"></div>
+  </div>
+</div>
+
+<!-- Loan Player Modal -->
+<div class="modal-overlay loan-modal" id="loanModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Loan Player</div>
+      <button class="modal-close" onclick="closeLoanModal()">&times;</button>
+    </div>
+    <div class="loan-form">
+      <label>Player Name</label>
+      <input type="text" id="loanName" placeholder="e.g. Kevin Joseph">
+      <label>OVR</label>
+      <input type="number" id="loanOvr" placeholder="e.g. 73" min="1" max="99">
+      <label>Position</label>
+      <select id="loanPos"></select>
+      <label>Assign To</label>
+      <select id="loanTarget">
+        <option value="starters">Starters</option>
+        <option value="backups">Backups</option>
+      </select>
+      <label>Slot</label>
+      <select id="loanSlot"></select>
+      <button class="btn btn-accent" style="margin-top: 8px;" onclick="confirmLoan()">Add Loan Player</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import input -->
+<input type="file" id="importInput" accept=".json" style="display:none">
+
+<!-- Copied toast -->
+<div class="copied-toast" id="copiedToast">Copied!</div>
+
+<script>
+// ===== DATA =====
+let allPlayers = [];
+let squads = [];
+let activeSquadId = null;
+let addPlayerTarget = 'starters'; // which section we're adding to
+let addPlayerSlotIdx = null;
+
+const POSITION_ORDER = ['GK','RB','RWB','CB','LB','LWB','CDM','RM','CM','LM','CAM','RW','CF','LW','ST'];
+
+const OVR_BANDS = [
+  [80, 99, '80+'],
+  [75, 79, '75-79'],
+  [70, 74, '70-74'],
+  [65, 69, '65-69'],
+  [60, 64, '60-64'],
+  [55, 59, '55-59'],
+  [50, 54, '50-54'],
+  [45, 49, '45-49'],
+  [40, 44, '40-44'],
+  [35, 39, '35-39'],
+  [30, 34, '30-34']
+];
+
+// ===== FORMATIONS =====
+// Position coordinates on pitch as percentage [x%, y%] from top-left
+// Pitch orientation: GK at bottom, attackers at top
+const FORMATIONS = {
+  '3-4-2-1': {
+    positions: ['ST','CAM','CAM','LM','CM','CM','RM','CB','CB','CB','GK'],
+    coords: [[50,10],[35,25],[65,25],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]
+  },
+  '3-4-3': {
+    positions: ['LW','ST','RW','LM','CM','CM','RM','CB','CB','CB','GK'],
+    coords: [[20,10],[50,10],[80,10],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]
+  },
+  '3-4-3 (diamond)': {
+    positions: ['LW','ST','RW','LM','CAM','CDM','RM','CB','CB','CB','GK'],
+    coords: [[20,10],[50,10],[80,10],[12,42],[50,35],[50,55],[88,42],[30,72],[50,72],[70,72],[50,90]]
+  },
+  '3-5-2': {
+    positions: ['ST','ST','CAM','LM','CM','CM','RM','CB','CB','CB','GK'],
+    coords: [[35,10],[65,10],[50,25],[12,42],[35,50],[65,50],[88,42],[30,72],[50,72],[70,72],[50,90]]
+  },
+  '3-5-2 (B)': {
+    positions: ['ST','ST','LM','CM','CDM','CM','RM','CB','CB','CB','GK'],
+    coords: [[35,10],[65,10],[12,38],[35,42],[50,52],[65,42],[88,38],[30,72],[50,72],[70,72],[50,90]]
+  },
+  '4-1-2-1-2': {
+    positions: ['ST','ST','CAM','LM','RM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[50,27],[22,40],[78,40],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-1-2-1-2 (narrow)': {
+    positions: ['ST','ST','CAM','CM','CM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[50,27],[35,40],[65,40],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-1-3-2': {
+    positions: ['ST','ST','LM','CM','RM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[22,32],[50,35],[78,32],[50,55],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-1-4-1': {
+    positions: ['ST','LM','CM','CM','RM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[50,10],[15,30],[38,35],[62,35],[85,30],[50,52],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-2-2-2': {
+    positions: ['ST','ST','LM','RM','CDM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[25,32],[75,32],[38,52],[62,52],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-2-3-1': {
+    positions: ['ST','LW','CAM','RW','CDM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[50,10],[20,25],[50,28],[80,25],[38,50],[62,50],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-2-4': {
+    positions: ['LW','ST','ST','RW','CDM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[15,12],[38,10],[62,10],[85,12],[38,45],[62,45],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-1-2': {
+    positions: ['ST','ST','CAM','CM','CM','CM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[50,27],[30,45],[50,50],[70,45],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-2-1': {
+    positions: ['ST','LW','RW','CM','CM','CM','LB','CB','CB','RB','GK'],
+    coords: [[50,10],[30,24],[70,24],[30,45],[50,48],[70,45],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-3': {
+    positions: ['LW','ST','RW','CM','CM','CM','LB','CB','CB','RB','GK'],
+    coords: [[20,12],[50,10],[80,12],[30,42],[50,45],[70,42],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-3 (att)': {
+    positions: ['LW','ST','RW','LM','CAM','RM','LB','CB','CB','RB','GK'],
+    coords: [[20,12],[50,10],[80,12],[22,35],[50,30],[78,35],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-3 (def)': {
+    positions: ['LW','ST','RW','CM','CM','CDM','LB','CB','CB','RB','GK'],
+    coords: [[20,12],[50,10],[80,12],[30,38],[70,38],[50,52],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-3-3 (false 9)': {
+    positions: ['LW','CF','RW','CM','CM','CM','LB','CB','CB','RB','GK'],
+    coords: [[20,12],[50,15],[80,12],[30,42],[50,45],[70,42],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-4-1-1': {
+    positions: ['ST','CF','LM','CM','CM','RM','LB','CB','CB','RB','GK'],
+    coords: [[50,10],[50,27],[15,42],[38,47],[62,47],[85,42],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-4-2': {
+    positions: ['ST','ST','LM','CM','CM','RM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[15,40],[38,45],[62,45],[85,40],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '4-4-2 (B)': {
+    positions: ['ST','ST','LM','CDM','CDM','RM','LB','CB','CB','RB','GK'],
+    coords: [[35,10],[65,10],[15,40],[38,48],[62,48],[85,40],[15,72],[38,75],[62,75],[85,72],[50,90]]
+  },
+  '5-2-3': {
+    positions: ['LW','ST','RW','CM','CM','LWB','CB','CB','CB','RWB','GK'],
+    coords: [[20,12],[50,10],[80,12],[38,38],[62,38],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]
+  },
+  '5-3-2': {
+    positions: ['ST','ST','CM','CM','CM','LWB','CB','CB','CB','RWB','GK'],
+    coords: [[35,10],[65,10],[30,38],[50,42],[70,38],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]
+  },
+  '5-4-1': {
+    positions: ['ST','LM','CM','CM','RM','LWB','CB','CB','CB','RWB','GK'],
+    coords: [[50,10],[18,32],[38,38],[62,38],[82,32],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]
+  },
+  '5-4-1 (flat)': {
+    positions: ['ST','LM','CM','CM','RM','LWB','CB','CB','CB','RWB','GK'],
+    coords: [[50,10],[18,36],[38,36],[62,36],[82,36],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]
+  }
+};
+
+// ===== PARSING =====
+function parseFile1(content) {
+  // Profile view: name, OVR, positions, retirement, age, height, nationality
+  const players = {};
+  const regex = /aria-describedby="popup-(\d+)".*?class="text-truncate w-100">([^<]+)<\/div>.*?flex-basis-40"><div><div style="color:\s*([^"]+);">(\d+)<\/div>.*?flex-basis-120">([^<]+)<\/div>.*?retire in (\w+) season.*?cake2-fill me-1"(?:\s*style="color:\s*([^"]*);")?\s*><\/i>(\d+)<\/div>.*?rulers[^>]*><\/i>(\d+)<\/div>.*?flags\/([^.]+)\.svg/gs;
+  
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const id = match[1];
+    if (!players[id]) {
+      players[id] = {
+        id: id,
+        name: match[2].trim(),
+        ovrColor: match[3],
+        ovr: parseInt(match[4]),
+        positions: match[5].trim(),
+        retireIn: match[6] === 'null' ? null : parseInt(match[6]),
+        age: parseInt(match[8]),
+        height: parseInt(match[9]),
+        nationality: match[10]
+      };
+    }
+  }
+  return players;
+}
+
+function parseFile2(content) {
+  // Stats view: P, D, P, S, D, P
+  const stats = {};
+  const blocks = content.split(/(?=aria-describedby="popup-)/);
+  
+  for (const block of blocks) {
+    const idMatch = block.match(/popup-(\d+)/);
+    if (!idMatch) continue;
+    const id = idMatch[1];
+    
+    const statMatches = [...block.matchAll(/([PDSP]): <span[^>]*>(\d+)<\/span>/g)];
+    if (statMatches.length >= 6) {
+      stats[id] = {
+        pace: parseInt(statMatches[0][2]),
+        defending1: parseInt(statMatches[1][2]),
+        passing: parseInt(statMatches[2][2]),
+        shooting: parseInt(statMatches[3][2]),
+        defending2: parseInt(statMatches[4][2]),
+        physical: parseInt(statMatches[5][2])
+      };
+    }
+  }
+  return stats;
+}
+
+function parseFile3(content) {
+  // Positional OVRs
+  const posOvrs = {};
+  const playerRegex = /aria-describedby="popup-(\d+)"(.*?)(?=aria-describedby="popup-|$)/gs;
+  
+  let match;
+  while ((match = playerRegex.exec(content)) !== null) {
+    const id = match[1];
+    const block = match[2];
+    const ovrRegex = /d-inline-block" style="width: 38px;">([A-Z]+):<\/div><div class="d-inline-block" style="width: 40px;"><span[^>]*>(\d+)<\/span>/g;
+    const ovrs = {};
+    let ovrMatch;
+    while ((ovrMatch = ovrRegex.exec(block)) !== null) {
+      ovrs[ovrMatch[1]] = parseInt(ovrMatch[2]);
+    }
+    if (Object.keys(ovrs).length > 0) {
+      posOvrs[id] = ovrs;
+    }
+  }
+  return posOvrs;
+}
+
+function mergeData(file1Players, file2Stats, file3PosOvrs) {
+  const merged = [];
+  const seen = new Set();
+  
+  for (const id of Object.keys(file1Players)) {
+    const p = file1Players[id];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    
+    merged.push({
+      ...p,
+      stats: file2Stats[id] || null,
+      posOvrs: file3PosOvrs[id] || null
+    });
+  }
+  
+  merged.sort((a, b) => b.ovr - a.ovr);
+  return merged;
+}
+
+// ===== FILE UPLOAD =====
+const uploadedFiles = { 1: null, 2: null, 3: null };
+
+document.querySelectorAll('.upload-zone input[type="file"]').forEach(input => {
+  input.addEventListener('change', e => {
+    const fileNum = e.target.dataset.file;
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadedFiles[fileNum] = reader.result;
+      document.getElementById(`zone${fileNum}`).classList.add('loaded');
+      document.getElementById(`zone${fileNum}`).querySelector('.upload-zone-icon').textContent = '✓';
+      checkReady();
+    };
+    reader.readAsText(file);
+  });
+});
+
+function checkReady() {
+  const ready = uploadedFiles[1] && uploadedFiles[2] && uploadedFiles[3];
+  document.getElementById('btnLaunch').classList.toggle('ready', ready);
+}
+
+document.getElementById('btnLaunch').addEventListener('click', () => {
+  if (!uploadedFiles[1] || !uploadedFiles[2] || !uploadedFiles[3]) return;
+  
+  try {
+    const f1 = parseFile1(uploadedFiles[1]);
+    const f2 = parseFile2(uploadedFiles[2]);
+    const f3 = parseFile3(uploadedFiles[3]);
+    allPlayers = mergeData(f1, f2, f3);
+    
+    if (allPlayers.length === 0) {
+      alert('No players could be parsed. Check your files are the correct MFL exports.');
+      return;
+    }
+    
+    // Load saved squads from localStorage if same player set
+    const saved = localStorage.getItem('mfl_squads');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.playerCount === allPlayers.length) {
+          squads = data.squads;
+          activeSquadId = data.activeSquadId;
+        }
+      } catch(e) {}
+    }
+    
+    launchApp();
+  } catch (err) {
+    console.error(err);
+    alert('Error parsing files: ' + err.message);
+  }
+});
+
+// ===== LOAD SAVE =====
+document.getElementById('btnLoadSave').addEventListener('click', () => {
+  document.getElementById('loadSaveInput').click();
+});
+
+document.getElementById('loadSaveInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      allPlayers = data.players;
+      squads = data.squads;
+      activeSquadId = data.activeSquadId || null;
+      launchApp();
+    } catch(err) {
+      alert('Invalid save file');
+    }
+  };
+  reader.readAsText(file);
+});
+
+// ===== APP LAUNCH =====
+function launchApp() {
+  document.getElementById('uploadScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  
+  // Populate formation selects
+  const formNames = Object.keys(FORMATIONS);
+  ['startersFormation', 'backupsFormation'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">-- Select Formation --</option>';
+    formNames.forEach(f => {
+      sel.innerHTML += `<option value="${f}">${f}</option>`;
+    });
+  });
+  
+  // Populate filter position dropdown
+  const filterPos = document.getElementById('filterPos');
+  filterPos.innerHTML = '<option value="">All Positions</option>';
+  POSITION_ORDER.forEach(p => {
+    filterPos.innerHTML += `<option value="${p}">${p}</option>`;
+  });
+  
+  // Populate loan position dropdown
+  const loanPos = document.getElementById('loanPos');
+  loanPos.innerHTML = '';
+  POSITION_ORDER.forEach(p => {
+    loanPos.innerHTML += `<option value="${p}">${p}</option>`;
+  });
+  
+  renderPoolSummary();
+  renderSquadList();
+  
+  if (activeSquadId && squads.find(s => s.id === activeSquadId)) {
+    selectSquad(activeSquadId);
+  }
+  
+  autoSave();
+}
+
+// ===== POOL SUMMARY =====
+function getAssignedPlayerIds() {
+  const ids = new Set();
+  squads.forEach(sq => {
+    [...(sq.starters || []), ...(sq.backups || [])].forEach(slot => {
+      if (slot && slot.playerId) ids.add(slot.playerId);
+    });
+  });
+  return ids;
+}
+
+function getUnassignedPlayers() {
+  const assigned = getAssignedPlayerIds();
+  return allPlayers.filter(p => !assigned.has(p.id));
+}
+
+function renderPoolSummary() {
+  const unassigned = getUnassignedPlayers();
+  const container = document.getElementById('poolSummary');
+  
+  // Position counts
+  let html = '<div class="pool-section-title">Positions</div>';
+  POSITION_ORDER.forEach(pos => {
+    const count = unassigned.filter(p => p.positions.split(',')[0].trim() === pos).length;
+    html += `<div class="pool-item"><span class="pool-item-label">${pos}</span><span class="pool-item-count">${count}</span></div>`;
+  });
+  
+  html += '<div class="pool-divider"></div>';
+  html += '<div class="pool-section-title">OVR Bands</div>';
+  
+  OVR_BANDS.forEach(([min, max, label]) => {
+    const count = unassigned.filter(p => p.ovr >= min && p.ovr <= max).length;
+    if (count > 0 || min >= 40) {
+      html += `<div class="pool-item"><span class="pool-item-label">${label}</span><span class="pool-item-count">${count}</span></div>`;
+    }
+  });
+  
+  html += '<div class="pool-divider"></div>';
+  html += `<div class="pool-item"><span class="pool-item-label">Total</span><span class="pool-item-count" style="color:var(--accent)">${unassigned.length}</span></div>`;
+  
+  container.innerHTML = html;
+}
+
+// ===== SQUAD MANAGEMENT =====
+function addSquad() {
+  const id = 'sq_' + Date.now();
+  squads.push({
+    id: id,
+    name: 'Squad ' + (squads.length + 1),
+    startersFormation: '',
+    backupsFormation: '',
+    starters: [],
+    backups: [],
+    loans: []
+  });
+  renderSquadList();
+  selectSquad(id);
+  autoSave();
+}
+
+function deleteSquad(id) {
+  if (!confirm('Delete this squad? Players will return to the unassigned pool.')) return;
+  squads = squads.filter(s => s.id !== id);
+  if (activeSquadId === id) {
+    activeSquadId = null;
+    document.getElementById('squadContent').style.display = 'none';
+    document.getElementById('noSquadMsg').style.display = 'flex';
+  }
+  renderSquadList();
+  renderPoolSummary();
+  autoSave();
+}
+
+function renderSquadList() {
+  const container = document.getElementById('squadList');
+  container.innerHTML = '';
+  
+  squads.forEach(sq => {
+    const playerCount = (sq.starters || []).filter(s => s).length + 
+                       (sq.backups || []).filter(s => s).length +
+                       (sq.loans || []).length;
+    const div = document.createElement('div');
+    div.className = 'squad-list-item' + (sq.id === activeSquadId ? ' active' : '');
+    div.innerHTML = `
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(sq.name)}</span>
+      <span class="squad-count">${playerCount}</span>
+      <button class="squad-delete-btn" onclick="event.stopPropagation();deleteSquad('${sq.id}')">&times;</button>
+    `;
+    div.addEventListener('click', () => selectSquad(sq.id));
+    container.appendChild(div);
+  });
+}
+
+function selectSquad(id) {
+  activeSquadId = id;
+  document.getElementById('noSquadMsg').style.display = 'none';
+  document.getElementById('squadContent').style.display = 'block';
+  
+  const sq = squads.find(s => s.id === id);
+  if (!sq) return;
+  
+  document.getElementById('squadNameInput').value = sq.name;
+  document.getElementById('startersFormation').value = sq.startersFormation || '';
+  document.getElementById('backupsFormation').value = sq.backupsFormation || '';
+  
+  renderSquadList();
+  renderPitch('starters');
+  renderPitch('backups');
+  renderSquadPlayerList();
+}
+
+document.getElementById('squadNameInput').addEventListener('input', e => {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (sq) {
+    sq.name = e.target.value;
+    renderSquadList();
+    autoSave();
+  }
+});
+
+// ===== FORMATION & PITCH =====
+function updateFormation(section) {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const sel = document.getElementById(section + 'Formation');
+  const newFormation = sel.value;
+  const oldFormation = sq[section + 'Formation'];
+  
+  sq[section + 'Formation'] = newFormation;
+  
+  // Keep assigned players if positions match, otherwise clear
+  if (newFormation && newFormation !== oldFormation) {
+    const formData = FORMATIONS[newFormation];
+    const oldSlots = sq[section] || [];
+    const newSlots = new Array(11).fill(null);
+    
+    // Try to remap players to matching positions
+    const usedOld = new Set();
+    formData.positions.forEach((pos, i) => {
+      for (let j = 0; j < oldSlots.length; j++) {
+        if (!usedOld.has(j) && oldSlots[j] && oldSlots[j].slotPos === pos) {
+          newSlots[i] = { ...oldSlots[j], slotPos: pos };
+          usedOld.add(j);
+          break;
+        }
+      }
+    });
+    
+    sq[section] = newSlots;
+  } else if (!newFormation) {
+    sq[section] = [];
+  }
+  
+  renderPitch(section);
+  renderSquadPlayerList();
+  renderPoolSummary();
+  autoSave();
+}
+
+function renderPitch(section) {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const container = document.getElementById(section + 'Pitch');
+  // Remove existing slots
+  container.querySelectorAll('.pitch-slot').forEach(el => el.remove());
+  
+  const formName = sq[section + 'Formation'];
+  if (!formName || !FORMATIONS[formName]) return;
+  
+  const form = FORMATIONS[formName];
+  const slots = sq[section] || [];
+  
+  form.positions.forEach((pos, i) => {
+    const slot = slots[i];
+    const div = document.createElement('div');
+    div.className = 'pitch-slot';
+    div.style.left = form.coords[i][0] + '%';
+    div.style.top = form.coords[i][1] + '%';
+    
+    if (slot && (slot.playerId || slot.isLoan)) {
+      const player = slot.isLoan ? slot : allPlayers.find(p => p.id === slot.playerId);
+      const ovrColor = getOvrColor(player ? player.ovr : 0);
+      const retireHtml = getRetireHtml(slot.isLoan ? null : (player ? player.retireIn : null));
+      const isLoan = slot.isLoan;
+      
+      div.innerHTML = `
+        <div class="pitch-slot-card ${isLoan ? 'loan' : ''}">
+          <button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>
+          ${isLoan ? '<div class="loan-badge">LOAN</div>' : ''}
+          <div class="pitch-slot-name">${escHtml(player ? player.name.split(' ').pop() : '?')}</div>
+          <div class="pitch-slot-ovr" style="color:${ovrColor}">${player ? player.ovr : '?'}</div>
+          ${retireHtml}
+          <div class="pitch-slot-pos">${pos}</div>
+        </div>
+      `;
+    } else {
+      div.innerHTML = `
+        <div class="pitch-slot-card empty" onclick="openAddPlayerForSlot('${section}',${i})">
+          <div class="pitch-slot-pos">${pos}</div>
+        </div>
+      `;
+    }
+    
+    container.appendChild(div);
+  });
+}
+
+function removeFromSlot(section, idx) {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const slot = sq[section][idx];
+  if (slot && slot.isLoan) {
+    // Remove loan
+    sq.loans = (sq.loans || []).filter(l => l !== slot);
+  }
+  
+  sq[section][idx] = null;
+  renderPitch(section);
+  renderSquadPlayerList();
+  renderPoolSummary();
+  autoSave();
+}
+
+// ===== ADD PLAYER MODAL =====
+function openAddPlayerForSlot(section, idx) {
+  addPlayerTarget = section;
+  addPlayerSlotIdx = idx;
+  openAddPlayerModal(section);
+}
+
+function openAddPlayerModal(section) {
+  addPlayerTarget = section;
+  document.getElementById('addPlayerModal').classList.add('open');
+  applyFilters();
+}
+
+function closeAddPlayerModal() {
+  document.getElementById('addPlayerModal').classList.remove('open');
+}
+
+function applyFilters() {
+  const nameFilter = document.getElementById('filterName').value.toLowerCase();
+  const posFilter = document.getElementById('filterPos').value;
+  const ovrMin = parseInt(document.getElementById('filterOvrMin').value) || 0;
+  const ovrMax = parseInt(document.getElementById('filterOvrMax').value) || 99;
+  const ageMin = parseInt(document.getElementById('filterAgeMin').value) || 0;
+  const ageMax = parseInt(document.getElementById('filterAgeMax').value) || 99;
+  
+  const assigned = getAssignedPlayerIds();
+  const available = allPlayers.filter(p => {
+    if (assigned.has(p.id)) return false;
+    if (nameFilter && !p.name.toLowerCase().includes(nameFilter)) return false;
+    if (posFilter) {
+      const playerPositions = p.positions.split(',').map(s => s.trim());
+      if (!playerPositions.includes(posFilter)) return false;
+    }
+    if (p.ovr < ovrMin || p.ovr > ovrMax) return false;
+    if (p.age < ageMin || p.age > ageMax) return false;
+    return true;
+  });
+  
+  const body = document.getElementById('playerListBody');
+  body.innerHTML = '';
+  
+  available.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'player-row';
+    div.innerHTML = `
+      <div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div>
+      <div class="pr-name">${escHtml(p.name)}</div>
+      <div class="pr-pos">${p.positions}</div>
+      <div class="pr-retire">${getRetireIcon(p.retireIn)}</div>
+      <div class="pr-age">${p.age}</div>
+      <div class="pr-nat">${formatNat(p.nationality)}</div>
+    `;
+    div.addEventListener('click', () => assignPlayer(p));
+    body.appendChild(div);
+  });
+}
+
+function assignPlayer(player) {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const section = addPlayerTarget;
+  const formName = sq[section + 'Formation'];
+  if (!formName) {
+    alert('Please select a formation first.');
+    return;
+  }
+  
+  const form = FORMATIONS[formName];
+  if (!sq[section]) sq[section] = new Array(11).fill(null);
+  
+  // If we have a specific slot target, use it
+  if (addPlayerSlotIdx !== null && !sq[section][addPlayerSlotIdx]) {
+    sq[section][addPlayerSlotIdx] = {
+      playerId: player.id,
+      slotPos: form.positions[addPlayerSlotIdx]
+    };
+  } else {
+    // Find first empty slot
+    const emptyIdx = sq[section].findIndex(s => !s);
+    if (emptyIdx === -1) {
+      alert('All slots are filled in this section.');
+      return;
+    }
+    sq[section][emptyIdx] = {
+      playerId: player.id,
+      slotPos: form.positions[emptyIdx]
+    };
+  }
+  
+  addPlayerSlotIdx = null;
+  closeAddPlayerModal();
+  renderPitch(section);
+  renderSquadPlayerList();
+  renderPoolSummary();
+  autoSave();
+}
+
+// ===== LOAN MODAL =====
+function openLoanModal() {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  // Update slot options based on current target formation
+  updateLoanSlots();
+  document.getElementById('loanModal').classList.add('open');
+}
+
+function closeLoanModal() {
+  document.getElementById('loanModal').classList.remove('open');
+}
+
+function updateLoanSlots() {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const target = document.getElementById('loanTarget').value;
+  const formName = sq[target + 'Formation'];
+  const slotSel = document.getElementById('loanSlot');
+  slotSel.innerHTML = '';
+  
+  if (!formName || !FORMATIONS[formName]) {
+    slotSel.innerHTML = '<option value="">Select formation first</option>';
+    return;
+  }
+  
+  const form = FORMATIONS[formName];
+  const slots = sq[target] || [];
+  
+  form.positions.forEach((pos, i) => {
+    if (!slots[i]) {
+      slotSel.innerHTML += `<option value="${i}">${pos} (Slot ${i + 1})</option>`;
+    }
+  });
+  
+  if (slotSel.options.length === 0) {
+    slotSel.innerHTML = '<option value="">No empty slots</option>';
+  }
+}
+
+document.getElementById('loanTarget').addEventListener('change', updateLoanSlots);
+
+function confirmLoan() {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const name = document.getElementById('loanName').value.trim();
+  const ovr = parseInt(document.getElementById('loanOvr').value);
+  const pos = document.getElementById('loanPos').value;
+  const target = document.getElementById('loanTarget').value;
+  const slotIdx = parseInt(document.getElementById('loanSlot').value);
+  
+  if (!name || !ovr || isNaN(slotIdx)) {
+    alert('Please fill in all fields.');
+    return;
+  }
+  
+  const formName = sq[target + 'Formation'];
+  if (!formName) return;
+  
+  const form = FORMATIONS[formName];
+  if (!sq[target]) sq[target] = new Array(11).fill(null);
+  
+  const loanData = {
+    isLoan: true,
+    name: name,
+    ovr: ovr,
+    positions: pos,
+    slotPos: form.positions[slotIdx]
+  };
+  
+  sq[target][slotIdx] = loanData;
+  if (!sq.loans) sq.loans = [];
+  sq.loans.push(loanData);
+  
+  closeLoanModal();
+  renderPitch(target);
+  renderSquadPlayerList();
+  autoSave();
+  
+  // Clear form
+  document.getElementById('loanName').value = '';
+  document.getElementById('loanOvr').value = '';
+}
+
+// ===== SQUAD PLAYER LIST =====
+function renderSquadPlayerList() {
+  const sq = squads.find(s => s.id === activeSquadId);
+  if (!sq) return;
+  
+  const container = document.getElementById('squadPlayerList');
+  let html = '<div class="squad-player-list-title">Squad Players — click name to copy surname</div>';
+  
+  const sections = [
+    { key: 'starters', label: 'Starters' },
+    { key: 'backups', label: 'Backups' }
+  ];
+  
+  sections.forEach(({ key, label }) => {
+    const slots = sq[key] || [];
+    const filledSlots = slots.filter(s => s);
+    if (filledSlots.length === 0) return;
+    
+    html += `<div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px">${label}</div>`;
+    
+    filledSlots.forEach(slot => {
+      const player = slot.isLoan ? slot : allPlayers.find(p => p.id === slot.playerId);
+      if (!player) return;
+      
+      const surname = player.name.split(' ').pop();
+      const isLoan = slot.isLoan;
+      
+      html += `
+        <div class="squad-player-entry ${isLoan ? 'loan-entry' : ''}" onclick="copySurname('${escAttr(surname)}')" title="Click to copy: ${escAttr(surname)}">
+          <span class="sp-ovr" style="color:${getOvrColor(player.ovr)}">${player.ovr}</span>
+          <span class="sp-name">${escHtml(player.name)}${isLoan ? ' <span class="loan-badge">LOAN</span>' : ''}</span>
+          <span class="sp-pos">${slot.slotPos}</span>
+        </div>
+      `;
+    });
+  });
+  
+  container.innerHTML = html;
+}
+
+function copySurname(name) {
+  navigator.clipboard.writeText(name).then(() => {
+    const toast = document.getElementById('copiedToast');
+    toast.textContent = `Copied: ${name}`;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
+// ===== HELPERS =====
+function getOvrColor(ovr) {
+  if (ovr >= 80) return '#fa53ff';
+  if (ovr >= 70) return '#169fed';
+  if (ovr >= 60) return '#3af24b';
+  if (ovr >= 50) return '#ffcc00';
+  return '#9f9f9f';
+}
+
+function getRetireHtml(retireIn) {
+  if (!retireIn) return '';
+  const colors = { 3: '#ffcc00', 2: '#ff9900', 1: '#ff0000' };
+  return `<div class="pitch-slot-retire" style="color:${colors[retireIn] || '#fff'}">🎂 ${retireIn}s</div>`;
+}
+
+function getRetireIcon(retireIn) {
+  if (!retireIn) return '';
+  const colors = { 3: '#ffcc00', 2: '#ff9900', 1: '#ff0000' };
+  return `<span style="color:${colors[retireIn]}">🎂</span>`;
+}
+
+function formatNat(nat) {
+  if (!nat) return '';
+  return nat.replace(/_/g, ' ').split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escAttr(str) {
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ===== PERSISTENCE =====
+function autoSave() {
+  try {
+    localStorage.setItem('mfl_squads', JSON.stringify({
+      playerCount: allPlayers.length,
+      squads: squads,
+      activeSquadId: activeSquadId
+    }));
+  } catch(e) {}
+}
+
+function exportSession() {
+  const data = {
+    version: 1,
+    exportDate: new Date().toISOString(),
+    players: allPlayers,
+    squads: squads,
+    activeSquadId: activeSquadId
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mfl-squads-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importSession() {
+  document.getElementById('importInput').click();
+}
+
+document.getElementById('importInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      allPlayers = data.players;
+      squads = data.squads;
+      activeSquadId = data.activeSquadId || null;
+      
+      renderPoolSummary();
+      renderSquadList();
+      if (activeSquadId) selectSquad(activeSquadId);
+      autoSave();
+    } catch(err) {
+      alert('Invalid save file');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+function resetAll() {
+  if (!confirm('Reset everything? All squad assignments will be lost.')) return;
+  squads = [];
+  activeSquadId = null;
+  localStorage.removeItem('mfl_squads');
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('uploadScreen').style.display = 'flex';
+  uploadedFiles[1] = uploadedFiles[2] = uploadedFiles[3] = null;
+  document.querySelectorAll('.upload-zone').forEach(z => {
+    z.classList.remove('loaded');
+    z.querySelector('.upload-zone-icon').textContent = '📋';
+  });
+  document.querySelectorAll('.upload-zone input').forEach(i => i.value = '');
+  checkReady();
+}
+</script>
+</body>
+</html>
