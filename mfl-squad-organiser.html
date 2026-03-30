@@ -248,6 +248,7 @@ body {
       <label class="filter-label">Age</label>
       <input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" oninput="applyFilters()">
       <input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" oninput="applyFilters()">
+      <span id="filterCount" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
     </div>
     <div style="display:flex;align-items:center;padding:6px 20px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;gap:6px">
       <div style="width:30px;text-align:center">OVR</div><div style="flex:1">Name</div><div style="width:90px">Pos</div><div style="width:160px;display:flex;gap:2px"><div style="width:24px;text-align:center">PAC</div><div style="width:24px;text-align:center">DRI</div><div style="width:24px;text-align:center">PAS</div><div style="width:24px;text-align:center">SHO</div><div style="width:24px;text-align:center">DEF</div><div style="width:24px;text-align:center">PHY</div></div><div style="width:20px"></div><div style="width:26px;text-align:center">Age</div><div style="width:70px;text-align:right">Nat</div>
@@ -412,6 +413,7 @@ function applyFilters(){
     div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${p.positions}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
+  document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
 }
 
 function assignPlayer(player){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const section=addPlayerTarget,fn=sq[section+'Formation'];if(!fn){alert('Select a formation first.');return;}const form=FORMATIONS[fn];if(!sq[section])sq[section]=new Array(11).fill(null);if(addPlayerSlotIdx!==null&&!sq[section][addPlayerSlotIdx]){sq[section][addPlayerSlotIdx]={playerId:player.id,slotPos:form.positions[addPlayerSlotIdx]};}else{const ei=sq[section].findIndex(s=>!s);if(ei===-1){alert('All slots filled.');return;}sq[section][ei]={playerId:player.id,slotPos:form.positions[ei]};}addPlayerSlotIdx=null;closeAddPlayerModal();renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
