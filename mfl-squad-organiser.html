@@ -667,12 +667,12 @@ function applyFilters(){
       const chipBg=isFiltered?'rgba(22,159,237,0.2)':isUpgrade?'rgba(58,242,75,0.15)':'var(--bg-tertiary)';
       return `<span class="pos-chip" style="background:${chipBg}"><span class="pos-chip__label">${pos}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
     }).join('');
-    // Also show filtered position chip if player doesn't officially play there (marked OOP)
-    let extraChip='';
-    if(pf&&!positions.includes(pf)){
-      const posOvr=getPosOvr(p,pf);
-      extraChip=`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pf}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
-    }
+    // OOP chips: position filter chip + any Alt Upgrade qualifying OOP positions
+    const makeOopChip=(pos,ovr)=>`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pos}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(ovr)}">${ovr}</span></span>`;
+    const oopPositions=new Set();
+    if(pf&&!positions.includes(pf))oopPositions.add(pf);
+    if(upgradeFilterOn&&p.metadata)POSITION_ORDER.forEach(pos=>{if(!positions.includes(pos)&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95))oopPositions.add(pos);});
+    const extraChip=[...oopPositions].map(pos=>makeOopChip(pos,Math.round(getPosOvr(p,pos)))).join('');
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
     div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}${extraChip}</div>${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
