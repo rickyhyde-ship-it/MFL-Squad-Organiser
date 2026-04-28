@@ -47,18 +47,31 @@ body {
 }
 .upload-title { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.5px; }
 .upload-subtitle { color: var(--text-secondary); margin-bottom: 40px; font-size: 14px; }
-.upload-zones { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 30px; }
-.upload-zone { width: 220px; height: 160px; border: 2px dashed var(--border-light); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: var(--bg-secondary); position: relative; }
-.upload-zone:hover { border-color: var(--accent); background: var(--accent-glow); }
-.upload-zone.loaded { border-color: var(--green); border-style: solid; }
-.upload-zone-label { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
-.upload-zone-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-.upload-zone-icon { font-size: 32px; color: var(--text-muted); }
-.upload-zone.loaded .upload-zone-icon { color: var(--green); }
-.upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-#btnLaunch { font-family: 'JetBrains Mono', monospace; padding: 12px 40px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: all 0.2s; }
-#btnLaunch.ready { opacity: 1; pointer-events: all; }
-#btnLaunch.ready:hover { background: #1ab0ff; transform: translateY(-1px); }
+
+.wallet-box {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: 100%; max-width: 440px; margin-bottom: 24px;
+}
+.wallet-input {
+  width: 100%; padding: 12px 16px;
+  background: var(--bg-secondary); border: 2px solid var(--border-light);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace; font-size: 14px; outline: none;
+  transition: border-color 0.2s;
+}
+.wallet-input:focus { border-color: var(--accent); }
+.wallet-input::placeholder { color: var(--text-muted); }
+#btnLoad {
+  font-family: 'JetBrains Mono', monospace; padding: 12px 0;
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer; width: 100%;
+  opacity: 0.4; pointer-events: none; transition: all 0.2s;
+}
+#btnLoad.ready { opacity: 1; pointer-events: all; }
+#btnLoad.ready:hover { background: #1ab0ff; transform: translateY(-1px); }
+#btnLoad:disabled { cursor: not-allowed; }
+#loadStatus { font-size: 13px; min-height: 20px; text-align: center; }
+
 .upload-or { color: var(--text-muted); font-size: 13px; margin: 15px 0; }
 #btnLoadSave { font-family: 'JetBrains Mono', monospace; padding: 10px 30px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; margin-bottom: 15px; }
 #btnLoadSave:hover { border-color: var(--accent); color: var(--accent); }
@@ -182,17 +195,17 @@ body {
 <body>
 <div id="uploadScreen">
   <div class="upload-title">MFL Squad Organiser</div>
-  <div class="upload-subtitle">Upload your 3 MFL player data files to get started</div>
-  <div class="upload-zones">
-    <div class="upload-zone" id="zone1"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 1</div><div class="upload-zone-desc">Profile view</div><input type="file" accept=".txt,.html,.htm" data-file="1"></div>
-    <div class="upload-zone" id="zone2"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 2</div><div class="upload-zone-desc">Stats view (P/D/P/S/D/P)</div><input type="file" accept=".txt,.html,.htm" data-file="2"></div>
-    <div class="upload-zone" id="zone3"><div class="upload-zone-icon">📋</div><div class="upload-zone-label">File 3</div><div class="upload-zone-desc">Positional OVRs</div><input type="file" accept=".txt,.html,.htm" data-file="3"></div>
+  <div class="upload-subtitle">Enter your wallet address to load your players</div>
+  <div class="wallet-box">
+    <input class="wallet-input" id="walletInput" type="text" placeholder="0x..." autocomplete="off"
+           oninput="checkWalletReady()" onkeydown="if(event.key==='Enter')loadPlayers()">
+    <button id="btnLoad" onclick="loadPlayers()">Load Players</button>
+    <div id="loadStatus" style="color:var(--text-secondary)"></div>
   </div>
-  <button id="btnLaunch">Launch Squad Organiser</button>
   <div class="upload-or">— or —</div>
-  <button id="btnLoadSave">Load Saved Session</button>
+  <button id="btnLoadSave" onclick="document.getElementById('loadSaveInput').click()">Load Saved Session</button>
   <input type="file" id="loadSaveInput" accept=".json" style="display:none">
-  <div style="margin-top:30px;color:var(--text-muted);font-size:11px;">Built by <span style="color:var(--accent)">ricky_hyde</span> on Discord for feedback & suggestions</div>
+  <div style="margin-top:30px;color:var(--text-muted);font-size:11px;">Built by <span style="color:var(--accent)">ricky_hyde</span> on Discord for feedback &amp; suggestions</div>
 </div>
 
 <div id="appScreen">
@@ -309,34 +322,196 @@ const FORMATIONS={
 '5-4-1 (flat)':{positions:['ST','LM','CM','CM','RM','LWB','CB','CB','CB','RWB','GK'],coords:[[50,10],[18,36],[38,36],[62,36],[82,36],[12,58],[30,72],[50,72],[70,72],[88,58],[50,90]]}
 };
 
-function parseFile1(c){const p={};const r=/aria-describedby="popup-(\d+)".*?class="text-truncate w-100">([^<]+)<\/div>.*?flex-basis-40"><div><div style="color:\s*([^"]+);">(\d+)<\/div>.*?flex-basis-120">([^<]+)<\/div>.*?retire in (\w+) season.*?cake2-fill me-1"(?:\s*style="color:\s*([^"]*);")?\s*><\/i>(\d+)<\/div>.*?rulers[^>]*><\/i>(\d+)<\/div>.*?flags\/([^.]+)\.svg/gs;let m;while((m=r.exec(c))!==null){const id=m[1];if(!p[id])p[id]={id,name:m[2].trim(),ovrColor:m[3],ovr:+m[4],positions:m[5].trim(),retireIn:m[6]==='null'?null:+m[6],age:+m[8],height:+m[9],nationality:m[10]};}return p;}
+// ── OVR calculation (ported from MFL Enhancement Suite) ──────────────
+// stat order: [passing, shooting, defense, dribbling, pace, physical, goalkeeping]
+const POSITION_WEIGHTS=[
+  {positions:['GK'],                         weights:[0,    0,    0,    0,    0,    0,    1   ]},
+  {positions:['CB'],                          weights:[0.05, 0,    0.64, 0.09, 0.02, 0.20, 0   ]},
+  {positions:['LWB','RWB','LB','RB'],         weights:[0.19, 0,    0.44, 0.17, 0.10, 0.10, 0   ]},
+  {positions:['CDM'],                         weights:[0.28, 0,    0.40, 0.17, 0,    0.15, 0   ]},
+  {positions:['CM','LM','RM'],                weights:[0.43, 0.12, 0.10, 0.29, 0,    0.06, 0   ]},
+  {positions:['CAM'],                         weights:[0.34, 0.21, 0,    0.38, 0.07, 0,    0   ]},
+  {positions:['CF','LW','RW'],                weights:[0.24, 0.23, 0,    0.40, 0.13, 0,    0   ]},
+  {positions:['ST'],                          weights:[0.10, 0.46, 0,    0.29, 0.10, 0.05, 0   ]},
+];
 
-function parseFile2(c){const s={};const blocks=c.split(/(?=aria-describedby="popup-)/);for(const b of blocks){const im=b.match(/popup-(\d+)/);if(!im)continue;const sm=[...b.matchAll(/([PDSP]): <span[^>]*>(\d+)<\/span>/g)];if(sm.length>=6)s[im[1]]={pace:+sm[0][2],defending1:+sm[1][2],passing:+sm[2][2],shooting:+sm[3][2],defending2:+sm[4][2],physical:+sm[5][2]};}return s;}
+const FAMILIARITY={
+  GK: {GK:0,  CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:-20,CM:-20,CAM:-20,RM:-20,LM:-20,RW:-20,LW:-20,CF:-20,ST:-20},
+  CB: {GK:-20,CB:0,  RB:-8, LB:-8, RWB:-20,LWB:-20,CDM:-8, CM:-20,CAM:-20,RM:-20,LM:-20,RW:-20,LW:-20,CF:-20,ST:-20},
+  RB: {GK:-20,CB:-8, RB:0,  LB:-8, RWB:-5, LWB:-20,CDM:-20,CM:-20,CAM:-20,RM:-8, LM:-20,RW:-20,LW:-20,CF:-20,ST:-20},
+  LB: {GK:-20,CB:-8, RB:-8, LB:0,  RWB:-20,LWB:-5, CDM:-20,CM:-20,CAM:-20,RM:-20,LM:-8, RW:-20,LW:-20,CF:-20,ST:-20},
+  RWB:{GK:-20,CB:-20,RB:-5, LB:-20,RWB:0,  LWB:-8, CDM:-20,CM:-20,CAM:-20,RM:-8, LM:-20,RW:-8, LW:-20,CF:-20,ST:-20},
+  LWB:{GK:-20,CB:-20,RB:-20,LB:-5, RWB:-8, LWB:0,  CDM:-20,CM:-20,CAM:-20,RM:-20,LM:-8, RW:-20,LW:-8, CF:-20,ST:-20},
+  CDM:{GK:-20,CB:-8, RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:0,  CM:-5, CAM:-8, RM:-20,LM:-20,RW:-20,LW:-20,CF:-20,ST:-20},
+  CM: {GK:-20,CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:-5, CM:0,  CAM:-5, RM:-8, LM:-8, RW:-20,LW:-20,CF:-20,ST:-20},
+  CAM:{GK:-20,CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:-8, CM:-5, CAM:0,  RM:-20,LM:-20,RW:-20,LW:-20,CF:-5, ST:-20},
+  RM: {GK:-20,CB:-20,RB:-8, LB:-20,RWB:-8, LWB:-20,CDM:-20,CM:-8, CAM:-20,RM:0,  LM:-8, RW:-5, LW:-20,CF:-20,ST:-20},
+  LM: {GK:-20,CB:-20,RB:-20,LB:-8, RWB:-20,LWB:-8, CDM:-20,CM:-8, CAM:-20,RM:-8, LM:0,  RW:-20,LW:-5, CF:-20,ST:-20},
+  RW: {GK:-20,CB:-20,RB:-20,LB:-20,RWB:-8, LWB:-20,CDM:-20,CM:-20,CAM:-20,RM:-5, LM:-20,RW:0,  LW:-8, CF:-20,ST:-20},
+  LW: {GK:-20,CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-8, CDM:-20,CM:-20,CAM:-20,RM:-20,LM:-5, RW:-8, LW:0,  CF:-20,ST:-20},
+  CF: {GK:-20,CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:-20,CM:-20,CAM:-5, RM:-20,LM:-20,RW:-20,LW:-20,CF:0,  ST:-5 },
+  ST: {GK:-20,CB:-20,RB:-20,LB:-20,RWB:-20,LWB:-20,CDM:-20,CM:-20,CAM:-20,RM:-20,LM:-20,RW:-20,LW:-20,CF:-5, ST:0  },
+};
 
-function parseFile3(c){const p={};const r=/aria-describedby="popup-(\d+)"(.*?)(?=aria-describedby="popup-|$)/gs;let m;while((m=r.exec(c))!==null){const o={};let om;const or=/d-inline-block" style="width: 38px;">([A-Z]+):<\/div><div class="d-inline-block" style="width: 40px;"><span[^>]*>(\d+)<\/span>/g;while((om=or.exec(m[2]))!==null)o[om[1]]=+om[2];if(Object.keys(o).length>0)p[m[1]]=o;}return p;}
+function getFamiliarityAdjustment(positions, targetPos) {
+  const primary = positions[0];
+  if (primary === targetPos) return 0;
+  if (positions.slice(1).includes(targetPos)) return -1;
+  const row = FAMILIARITY[primary];
+  if (row && targetPos in row) return row[targetPos];
+  return -20;
+}
 
-function mergeData(f1,f2,f3){const m=[],s=new Set();for(const id of Object.keys(f1)){if(s.has(id))continue;s.add(id);m.push({...f1[id],stats:f2[id]||null,posOvrs:f3[id]||null});}m.sort((a,b)=>b.ovr-a.ovr);return m;}
+function ovrAtPosition(metadata, targetPos) {
+  const adj = getFamiliarityAdjustment(metadata.positions || [], targetPos);
+  const clamp = v => Math.min(99, Math.max(0, (v || 0) + adj));
+  const stats = [
+    clamp(metadata.passing),
+    clamp(metadata.shooting),
+    clamp(metadata.defense),
+    clamp(metadata.dribbling),
+    clamp(metadata.pace),
+    clamp(metadata.physical),
+    clamp(metadata.goalkeeping),
+  ];
+  const group = POSITION_WEIGHTS.find(g => g.positions.includes(targetPos));
+  if (!group) return 0;
+  return Math.round(
+    stats[0]*group.weights[0] + stats[1]*group.weights[1] + stats[2]*group.weights[2] +
+    stats[3]*group.weights[3] + stats[4]*group.weights[4] + stats[5]*group.weights[5] +
+    stats[6]*group.weights[6]
+  );
+}
 
-const uploadedFiles={1:null,2:null,3:null};
-document.querySelectorAll('.upload-zone input[type="file"]').forEach(input=>{input.addEventListener('change',e=>{const fn=e.target.dataset.file,f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{uploadedFiles[fn]=r.result;document.getElementById('zone'+fn).classList.add('loaded');document.getElementById('zone'+fn).querySelector('.upload-zone-icon').textContent='✓';checkReady();};r.readAsText(f);});});
-function checkReady(){document.getElementById('btnLaunch').classList.toggle('ready',!!(uploadedFiles[1]&&uploadedFiles[2]&&uploadedFiles[3]));}
+// ── API fetch ─────────────────────────────────────────────────────────
+function mapApiPlayer(p) {
+  const m = p.metadata || {};
+  const positions = Array.isArray(m.positions) ? m.positions : [];
+  if (!positions.length) return null;
+  const nat = Array.isArray(m.nationalities) ? m.nationalities[0] : (m.nationality || null);
+  return {
+    id: String(p.id),
+    name: [m.firstName, m.lastName].filter(Boolean).join(' ') || 'Player ' + p.id,
+    ovr: ovrAtPosition(m, positions[0]),
+    positions: positions.join(', '),
+    retireIn: p.retirementYears || null,
+    age: m.age || null,
+    nationality: nat,
+    stats: {
+      pace:       m.pace       || 0,
+      defending1: m.dribbling  || 0,  // DRI column
+      passing:    m.passing    || 0,
+      shooting:   m.shooting   || 0,
+      defending2: m.defense    || 0,  // DEF column
+      physical:   m.physical   || 0,
+    },
+    metadata: m,
+  };
+}
 
-document.getElementById('btnLaunch').addEventListener('click',()=>{if(!uploadedFiles[1]||!uploadedFiles[2]||!uploadedFiles[3])return;try{allPlayers=mergeData(parseFile1(uploadedFiles[1]),parseFile2(uploadedFiles[2]),parseFile3(uploadedFiles[3]));if(!allPlayers.length){alert('No players parsed.');return;}const sv=localStorage.getItem('mfl_squads');if(sv)try{const d=JSON.parse(sv);if(d.playerCount===allPlayers.length){squads=d.squads;activeSquadId=d.activeSquadId;}}catch(e){}launchApp();}catch(e){console.error(e);alert('Error: '+e.message);}});
-document.getElementById('btnLoadSave').addEventListener('click',()=>document.getElementById('loadSaveInput').click());
-document.getElementById('loadSaveInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=d.players;squads=d.squads;activeSquadId=d.activeSquadId||null;launchApp();}catch(e){alert('Invalid save');}};r.readAsText(f);});
+function checkWalletReady() {
+  const ready = document.getElementById('walletInput').value.trim().length > 0;
+  const btn = document.getElementById('btnLoad');
+  btn.classList.toggle('ready', ready);
+  btn.disabled = !ready;
+}
 
-function launchApp(){
-  document.getElementById('uploadScreen').style.display='none';
-  document.getElementById('appScreen').style.display='block';
-  const fn=Object.keys(FORMATIONS);
-  ['startersFormation','backupsFormation'].forEach(id=>{const s=document.getElementById(id);s.innerHTML='<option value="">-- Select Formation --</option>';fn.forEach(f=>s.innerHTML+=`<option value="${f}">${f}</option>`);});
-  const fp=document.getElementById('filterPos');fp.innerHTML='<option value="">All Positions</option>';POSITION_ORDER.forEach(p=>fp.innerHTML+=`<option value="${p}">${p}</option>`);
-  const lp=document.getElementById('loanPos');lp.innerHTML='';POSITION_ORDER.forEach(p=>lp.innerHTML+=`<option value="${p}">${p}</option>`);
-  renderPoolSummary();renderSquadList();
-  if(activeSquadId&&squads.find(s=>s.id===activeSquadId))selectSquad(activeSquadId);
+async function loadPlayers() {
+  const wallet = document.getElementById('walletInput').value.trim();
+  if (!wallet) return;
+  const statusEl = document.getElementById('loadStatus');
+  const btn = document.getElementById('btnLoad');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = 'Fetching players…';
+  try {
+    const url = 'https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players?limit=1500&ownerWalletAddress=' + encodeURIComponent(wallet);
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('API error ' + resp.status);
+    const data = await resp.json();
+    const raw = Array.isArray(data) ? data : (data.players || data.items || data.results || data.data || []);
+    if (!raw.length) throw new Error('No players found for this wallet address.');
+    allPlayers = raw.map(mapApiPlayer).filter(Boolean).sort((a,b) => b.ovr - a.ovr);
+    localStorage.setItem('mfl_last_wallet', wallet);
+    // Restore squads saved for this wallet
+    const saved = localStorage.getItem('mfl_squads_' + wallet);
+    squads = []; activeSquadId = null;
+    if (saved) {
+      try { const d = JSON.parse(saved); squads = d.squads || []; activeSquadId = d.activeSquadId || null; } catch(e) {}
+    }
+    launchApp();
+  } catch(err) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = err.message.includes('Failed to fetch')
+      ? 'Network error — try serving this file via a local web server (CORS).'
+      : err.message;
+    btn.classList.add('ready');
+    btn.disabled = false;
+    btn.textContent = 'Load Players';
+  }
+}
+
+// ── Startup ───────────────────────────────────────────────────────────
+const lastWallet = localStorage.getItem('mfl_last_wallet');
+if (lastWallet) {
+  document.getElementById('walletInput').value = lastWallet;
+  checkWalletReady();
+}
+
+document.getElementById('loadSaveInput').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      allPlayers = d.players; squads = d.squads; activeSquadId = d.activeSquadId || null;
+      launchApp();
+    } catch(e) { alert('Invalid save file'); }
+  };
+  r.readAsText(f);
+});
+
+function launchApp() {
+  document.getElementById('uploadScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  const fn = Object.keys(FORMATIONS);
+  ['startersFormation','backupsFormation'].forEach(id => {
+    const s = document.getElementById(id);
+    s.innerHTML = '<option value="">-- Select Formation --</option>';
+    fn.forEach(f => s.innerHTML += `<option value="${f}">${f}</option>`);
+  });
+  const fp = document.getElementById('filterPos');
+  fp.innerHTML = '<option value="">All Positions</option>';
+  POSITION_ORDER.forEach(p => fp.innerHTML += `<option value="${p}">${p}</option>`);
+  const lp = document.getElementById('loanPos');
+  lp.innerHTML = '';
+  POSITION_ORDER.forEach(p => lp.innerHTML += `<option value="${p}">${p}</option>`);
+  renderPoolSummary(); renderSquadList();
+  if (activeSquadId && squads.find(s => s.id === activeSquadId)) selectSquad(activeSquadId);
   autoSave();
 }
 
+// ── Player OVR at slot position ───────────────────────────────────────
+function getPlayerPosOvr(player, slotPos) {
+  if (!player || player.isLoan) return {ovr: player ? player.ovr : 0, isOop: false};
+  // API-loaded players have metadata — use the full formula
+  if (player.metadata) {
+    const positions = player.metadata.positions || [];
+    return {
+      ovr: ovrAtPosition(player.metadata, slotPos),
+      isOop: !positions.includes(slotPos),
+    };
+  }
+  // Legacy players from old exported sessions (file-parsed, no metadata)
+  const pp = player.positions.split(',').map(s => s.trim());
+  if (pp[0] === slotPos) return {ovr: player.ovr, isOop: false};
+  if (player.posOvrs && player.posOvrs[slotPos] !== undefined) return {ovr: player.posOvrs[slotPos], isOop: false};
+  if (pp.includes(slotPos)) return {ovr: player.ovr - 1, isOop: false};
+  return {ovr: player.ovr, isOop: true};
+}
+
+// ── Squad management ──────────────────────────────────────────────────
 function getAssignedPlayerIds(){const ids=new Set();squads.forEach(sq=>{[...(sq.starters||[]),...(sq.backups||[])].forEach(sl=>{if(sl&&sl.playerId)ids.add(sl.playerId);});});return ids;}
 function getUnassignedPlayers(){const a=getAssignedPlayerIds();return allPlayers.filter(p=>!a.has(p.id));}
 
@@ -357,15 +532,6 @@ function selectSquad(id){activeSquadId=id;document.getElementById('noSquadMsg').
 document.getElementById('squadNameInput').addEventListener('input',e=>{const sq=squads.find(s=>s.id===activeSquadId);if(sq){sq.name=e.target.value;renderSquadList();autoSave();}});
 
 function updateFormation(section){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const sel=document.getElementById(section+'Formation'),nf=sel.value,of=sq[section+'Formation'];sq[section+'Formation']=nf;if(nf&&nf!==of){const fd=FORMATIONS[nf],os=sq[section]||[],ns=new Array(11).fill(null),used=new Set();fd.positions.forEach((pos,i)=>{for(let j=0;j<os.length;j++){if(!used.has(j)&&os[j]&&os[j].slotPos===pos){ns[i]={...os[j],slotPos:pos};used.add(j);break;}}});sq[section]=ns;}else if(!nf)sq[section]=[];renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
-
-function getPlayerPosOvr(player,slotPos){
-  if(!player||player.isLoan)return{ovr:player?player.ovr:0,isOop:false};
-  const pp=player.positions.split(',').map(s=>s.trim());
-  if(pp[0]===slotPos)return{ovr:player.ovr,isOop:false};
-  if(player.posOvrs&&player.posOvrs[slotPos]!==undefined)return{ovr:player.posOvrs[slotPos],isOop:false};
-  if(pp.includes(slotPos))return{ovr:player.ovr-1,isOop:false};
-  return{ovr:player.ovr,isOop:true};
-}
 
 function renderPitch(section){
   const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;
@@ -409,8 +575,8 @@ function applyFilters(){
   avail.forEach(p=>{
     const div=document.createElement('div');div.className='player-row';
     let statsH='';
-    if(p.stats){const s=p.stats,vals=[{l:'P',v:s.pace},{l:'D',v:s.defending1},{l:'P',v:s.passing},{l:'S',v:s.shooting},{l:'D',v:s.defending2},{l:'P',v:s.physical}];statsH='<div class="pr-stats">'+vals.map(x=>`<div class="pr-stat" style="color:${getOvrColor(x.v)}">${x.v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${p.positions}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${p.positions}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age||''}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
@@ -444,11 +610,17 @@ function formatNat(n){if(!n)return'';return n.replace(/_/g,' ').split(' ').map(w
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
 
-function autoSave(){try{localStorage.setItem('mfl_squads',JSON.stringify({playerCount:allPlayers.length,squads,activeSquadId}));}catch(e){}}
-function exportSession(){const d={version:1,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
+function autoSave(){
+  try {
+    const wallet = localStorage.getItem('mfl_last_wallet');
+    const key = wallet ? 'mfl_squads_' + wallet : 'mfl_squads';
+    localStorage.setItem(key, JSON.stringify({squads, activeSquadId}));
+  } catch(e) {}
+}
+function exportSession(){const d={version:2,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
 function importSession(){document.getElementById('importInput').click();}
 document.getElementById('importInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=d.players;squads=d.squads;activeSquadId=d.activeSquadId||null;renderPoolSummary();renderSquadList();if(activeSquadId)selectSquad(activeSquadId);autoSave();}catch(e){alert('Invalid save');}};r.readAsText(f);e.target.value='';});
-function resetAll(){if(!confirm('Reset everything?'))return;squads=[];activeSquadId=null;localStorage.removeItem('mfl_squads');document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';uploadedFiles[1]=uploadedFiles[2]=uploadedFiles[3]=null;document.querySelectorAll('.upload-zone').forEach(z=>{z.classList.remove('loaded');z.querySelector('.upload-zone-icon').textContent='📋';});document.querySelectorAll('.upload-zone input').forEach(i=>i.value='');checkReady();}
+function resetAll(){if(!confirm('Reset everything?'))return;squads=[];activeSquadId=null;allPlayers=[];const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 </script>
 </body>
 </html>
