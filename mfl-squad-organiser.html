@@ -135,7 +135,7 @@ body {
 /* Card-image layout — transparent background so the player art shows cleanly */
 .pitch-slot-card.has-img { background: transparent; padding: 0; justify-content: flex-start; }
 .pitch-slot-card.has-img:hover { background: transparent; }
-.pitch-slot-img { width: 100%; height: auto; display: block; }
+.pitch-slot-img { width: 100%; height: 62px; object-fit: cover; object-position: top 8%; display: block; }
 .pitch-slot-footer { width: 100%; background: rgba(8, 12, 18, 0.88); padding: 2px 4px 3px; text-align: center; }
 .pitch-slot-pos { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
 .pitch-slot-name { font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68px; }
@@ -181,11 +181,11 @@ body {
 .pos-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 5px; border-radius:4px; background:var(--bg-tertiary); font-family:'JetBrains Mono',monospace; font-size:10px; white-space:nowrap; }
 .pos-chip__label { color:var(--text-muted); }
 .pos-chip__ovr { font-weight:700; }
-.pitch-slot-img { width:52px; height:auto; border-radius:3px; margin-bottom:2px; display:block; }
+.pitch-slot-img { width: 100%; height: 62px; object-fit: cover; object-position: top 8%; display: block; }
 .pr-stats { font-family: 'JetBrains Mono', monospace; font-size: 10px; display: flex; gap: 2px; }
 .pr-stat { width: 24px; text-align: center; border-radius: 2px; padding: 1px 0; }
 .pr-retire { width: 20px; text-align: center; font-size: 13px; }
-.pr-age { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); width: 26px; text-align: center; }
+.pr-age { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); width: 46px; text-align: center; }
 .pr-nat { font-size: 11px; color: var(--text-secondary); width: 70px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .loan-modal .modal { max-width: 400px; }
@@ -561,8 +561,16 @@ function updateFormation(section){
     }
     sq[section]=ns;
   }else if(!nf){sq[section]=[];}
-  // When setting starters formation, default backups to the same if unset
-  if(section==='starters'&&nf&&!sq.backupsFormation){
+  // When setting starters formation, always sync backups to match
+  if(section==='starters'&&nf){
+    const bfd=FORMATIONS[nf];
+    if(bfd){
+      const bos=sq.backups||[],bns=new Array(11).fill(null),bused=new Set();
+      bfd.positions.forEach((pos,i)=>{for(let j=0;j<bos.length;j++){if(!bused.has(j)&&bos[j]&&bos[j].slotPos===pos){bns[i]={...bos[j],slotPos:pos};bused.add(j);break;}}});
+      const bleft=bos.filter((_,j)=>bos[j]&&!bused.has(j));let bli=0;
+      for(let i=0;i<bns.length&&bli<bleft.length;i++){if(!bns[i]){bns[i]={...bleft[bli],slotPos:bfd.positions[i]};bli++;}}
+      sq.backups=bns;
+    }
     sq.backupsFormation=nf;
     document.getElementById('backupsFormation').value=nf;
     renderPitch('backups');
@@ -590,6 +598,7 @@ function renderPitch(section){
       const hasImg=!isL&&!!player?.id;
       const imgH=hasImg?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.closest('.pitch-slot-card').classList.remove('has-img')">`:'';
       div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}</div>${retH}<div class="pitch-slot-pos">${pos}</div></div></div>`;
+      let _tc=0,_tt=null;div.addEventListener('click',()=>{_tc++;if(_tc===1)_tt=setTimeout(()=>{_tc=0;},600);if(_tc>=3){clearTimeout(_tt);_tc=0;removeFromSlot(section,i);}});
     }else{
       div.innerHTML=`<div class="pitch-slot-card empty" onclick="openAddPlayerForSlot('${section}',${i})"><div class="pitch-slot-pos">${pos}</div></div>`;
     }
@@ -600,7 +609,7 @@ function renderPitch(section){
   });
 }
 
-function removeFromSlot(section,idx){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const slot=sq[section][idx];if(slot&&slot.isLoan)sq.loans=(sq.loans||[]).filter(l=>l!==slot);sq[section][idx]=null;renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
+function removeFromSlot(section,idx){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const slot=sq[section][idx];if(slot&&slot.isLoan)sq.loans=(sq.loans||[]).filter(l=>l!==slot);sq[section][idx]=null;renderPitch(section);renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
 
 function openAddPlayerForSlot(section,idx){addPlayerTarget=section;addPlayerSlotIdx=idx;const sq=squads.find(s=>s.id===activeSquadId),fn=sq?sq[section+'Formation']:'',form=FORMATIONS[fn],sp=form?form.positions[idx]:'';document.getElementById('modalSlotInfo').textContent=sp?`→ ${section} ${sp}`:'';document.getElementById('filterPos').value=sp||'';openAddPlayerModal(section);}
 function openAddPlayerModal(section){addPlayerTarget=section;if(addPlayerSlotIdx===null)document.getElementById('modalSlotInfo').textContent=`→ ${section}`;document.getElementById('addPlayerModal').classList.add('open');applyFilters();}
@@ -666,13 +675,13 @@ function applyFilters(){
     }
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}${extraChip}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age||''}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}${extraChip}</div>${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
 }
 
-function assignPlayer(player){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const section=addPlayerTarget,fn=sq[section+'Formation'];if(!fn){alert('Select a formation first.');return;}const form=FORMATIONS[fn];if(!sq[section])sq[section]=new Array(11).fill(null);if(addPlayerSlotIdx!==null&&!sq[section][addPlayerSlotIdx]){sq[section][addPlayerSlotIdx]={playerId:player.id,slotPos:form.positions[addPlayerSlotIdx]};}else{const ei=sq[section].findIndex(s=>!s);if(ei===-1){alert('All slots filled.');return;}sq[section][ei]={playerId:player.id,slotPos:form.positions[ei]};}addPlayerSlotIdx=null;closeAddPlayerModal();renderPitch(section);renderSquadPlayerList();renderPoolSummary();autoSave();}
+function assignPlayer(player){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;const section=addPlayerTarget,fn=sq[section+'Formation'];if(!fn){alert('Select a formation first.');return;}const form=FORMATIONS[fn];if(!sq[section])sq[section]=new Array(11).fill(null);if(addPlayerSlotIdx!==null&&!sq[section][addPlayerSlotIdx]){sq[section][addPlayerSlotIdx]={playerId:player.id,slotPos:form.positions[addPlayerSlotIdx]};}else{const ei=sq[section].findIndex(s=>!s);if(ei===-1){alert('All slots filled.');return;}sq[section][ei]={playerId:player.id,slotPos:form.positions[ei]};}addPlayerSlotIdx=null;closeAddPlayerModal();renderPitch(section);renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
 
 function openLoanModal(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;updateLoanSlots();document.getElementById('loanModal').classList.add('open');}
 function closeLoanModal(){document.getElementById('loanModal').classList.remove('open');}
@@ -687,7 +696,7 @@ function renderSquadPlayerList(){
     const slots=sq[key]||[],filled=slots.filter(s=>s);if(!filled.length)return;
     h+=`<div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px">${label}</div>`;
     filled.forEach(slot=>{const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);if(!player)return;const sn=player.name.split(' ').pop(),isL=slot.isLoan,{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
-    h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}</span><span class="sp-pos">${slot.slotPos}</span></div>`;});
+    h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}${!isL?getRetireIcon(player.retireIn):''}</span><span class="sp-pos">${slot.slotPos}</span></div>`;});
   });c.innerHTML=h;
 }
 
@@ -695,7 +704,7 @@ function copySurname(n){navigator.clipboard.writeText(n).then(()=>{const t=docum
 
 function getOvrColor(ovr){if(ovr>=85)return'#fa53ff';if(ovr>=75)return'#169fed';if(ovr>=65)return'#3af24b';if(ovr>=55)return'#ffcc00';return'#9f9f9f';}
 function getRetireHtml(r){if(!r)return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<div class="pitch-slot-retire" style="color:${c[r]||'#fff'}">🎂 ${r}s</div>`;}
-function getRetireIcon(r){if(!r)return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<span style="color:${c[r]};font-size:16px;line-height:1">●</span>`;}
+function getRetireIcon(r){if(!r||![1,2,3].includes(r))return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<span style="color:${c[r]};font-size:12px;line-height:1" title="${r} season${r>1?'s':''} to retirement">⚠</span>`;}
 function formatNat(n){if(!n)return'';return n.replace(/_/g,' ').split(' ').map(w=>w.charAt(0)+w.slice(1).toLowerCase()).join(' ');}
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
