@@ -645,7 +645,7 @@ function applyFilters(){
     if(p.ovr<oMin||p.ovr>oMax)return false;
     if(p.age<aMin||p.age>aMax)return false;
     if(upgradeFilterOn&&p.metadata){
-      const hasUpgrade=POSITION_ORDER.some(pos=>pos!==p.metadata.positions[0]&&ovrAtPosition(p.metadata,pos)>p.ovr);
+      const hasUpgrade=POSITION_ORDER.some(pos=>pos!==p.metadata.positions[0]&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95));
       if(!hasUpgrade)return false;
     }
     return true;
