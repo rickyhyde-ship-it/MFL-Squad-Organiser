@@ -404,8 +404,8 @@ function mapApiPlayer(p) {
     name: [m.firstName, m.lastName].filter(Boolean).join(' ') || 'Player ' + p.id,
     ovr: ovrAtPosition(m, positions[0]),
     positions: positions.join(', '),
-    retireIn: p.retirementYears || null,
     age: m.age || null,
+    retireIn: m.retirementYears ?? null,
     nationality: nat,
     stats: {
       pace:       m.pace       || 0,
@@ -667,11 +667,11 @@ function applyFilters(){
       const chipBg=isFiltered?'rgba(22,159,237,0.2)':isUpgrade?'rgba(58,242,75,0.15)':'var(--bg-tertiary)';
       return `<span class="pos-chip" style="background:${chipBg}"><span class="pos-chip__label">${pos}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
     }).join('');
-    // Also show filtered position chip if player doesn't officially play there
+    // Also show filtered position chip if player doesn't officially play there (marked OOP)
     let extraChip='';
     if(pf&&!positions.includes(pf)){
       const posOvr=getPosOvr(p,pf);
-      extraChip=`<span class="pos-chip" style="background:rgba(22,159,237,0.2)"><span class="pos-chip__label">${pf}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
+      extraChip=`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pf}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
     }
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
@@ -703,8 +703,8 @@ function renderSquadPlayerList(){
 function copySurname(n){navigator.clipboard.writeText(n).then(()=>{const t=document.getElementById('copiedToast');t.textContent='Copied: '+n;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);});}
 
 function getOvrColor(ovr){if(ovr>=85)return'#fa53ff';if(ovr>=75)return'#169fed';if(ovr>=65)return'#3af24b';if(ovr>=55)return'#ffcc00';return'#9f9f9f';}
-function getRetireHtml(r){if(!r)return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<div class="pitch-slot-retire" style="color:${c[r]||'#fff'}">🎂 ${r}s</div>`;}
-function getRetireIcon(r){if(!r||![1,2,3].includes(r))return'';const c={3:'#ffcc00',2:'#ff9900',1:'#ff0000'};return`<span style="color:${c[r]};font-size:12px;line-height:1" title="${r} season${r>1?'s':''} to retirement">⚠</span>`;}
+function getRetireHtml(r){if(r===null||r===undefined||r>3)return'';const c={0:'#ff0000',1:'#ff0000',2:'#ff9900',3:'#ffcc00'};return`<div class="pitch-slot-retire" style="color:${c[r]}">🎂 ${r}s</div>`;}
+function getRetireIcon(r){if(r===null||r===undefined||r>3)return'';const c={0:'#ff0000',1:'#ff0000',2:'#ff9900',3:'#ffcc00'};const tip=r===0?'Retiring this season':`${r} season${r>1?'s':''} remaining`;return`<span style="color:${c[r]};font-size:12px;line-height:1" title="${tip}">⚠</span>`;}
 function formatNat(n){if(!n)return'';return n.replace(/_/g,' ').split(' ').map(w=>w.charAt(0)+w.slice(1).toLowerCase()).join(' ');}
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
