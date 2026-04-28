@@ -127,11 +127,16 @@ body {
 .pitch-slot { position: absolute; transform: translate(-50%, -50%); width: 72px; text-align: center; cursor: pointer; z-index: 2; }
 .pitch-slot.dragging { opacity: 0.4; z-index: 10; }
 .pitch-slot.drag-over .pitch-slot-card { border-color: var(--accent) !important; box-shadow: 0 0 12px var(--accent-glow); }
-.pitch-slot-card { background: rgba(10, 14, 19, 0.85); border: 1px solid var(--border-light); border-radius: 6px; padding: 4px 6px; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.15s; position: relative; }
+.pitch-slot-card { background: rgba(10, 14, 19, 0.85); border: 1px solid var(--border-light); border-radius: 6px; padding: 4px 6px; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.15s; position: relative; overflow: hidden; }
 .pitch-slot-card:hover { border-color: var(--accent); background: rgba(10, 14, 19, 0.95); }
 .pitch-slot-card.empty { border-style: dashed; opacity: 0.6; }
 .pitch-slot-card.loan { border-color: var(--loan-accent); box-shadow: 0 0 8px var(--loan-glow); }
 .pitch-slot-card.oop { border-color: var(--oop-color); border-width: 2px; }
+/* Card-image layout — transparent background so the player art shows cleanly */
+.pitch-slot-card.has-img { background: transparent; padding: 0; justify-content: flex-start; }
+.pitch-slot-card.has-img:hover { background: transparent; }
+.pitch-slot-img { width: 100%; height: auto; display: block; }
+.pitch-slot-footer { width: 100%; background: rgba(8, 12, 18, 0.88); padding: 2px 4px 3px; text-align: center; }
 .pitch-slot-pos { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
 .pitch-slot-name { font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68px; }
 .pitch-slot-ovr { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
@@ -582,8 +587,9 @@ function renderPitch(section){
       div.draggable=true;
       div.addEventListener('dragstart',e=>{dragSection=section;dragIdx=i;div.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
       div.addEventListener('dragend',()=>{div.classList.remove('dragging');dragSection=null;dragIdx=null;container.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));});
-      const imgH=(!isL&&player?.id)?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.style.display='none'">`:'';
-      div.innerHTML=`<div class="pitch-slot-card ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}</div>${retH}<div class="pitch-slot-pos">${pos}</div></div>`;
+      const hasImg=!isL&&!!player?.id;
+      const imgH=hasImg?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.closest('.pitch-slot-card').classList.remove('has-img')">`:'';
+      div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}</div>${retH}<div class="pitch-slot-pos">${pos}</div></div></div>`;
     }else{
       div.innerHTML=`<div class="pitch-slot-card empty" onclick="openAddPlayerForSlot('${section}',${i})"><div class="pitch-slot-pos">${pos}</div></div>`;
     }
@@ -609,13 +615,23 @@ function toggleUpgradeFilter(){
   applyFilters();
 }
 
+function getPosOvr(p, pos) {
+  if(p.metadata) return ovrAtPosition(p.metadata, pos);
+  if(p.posOvrs && p.posOvrs[pos] !== undefined) return p.posOvrs[pos];
+  return p.ovr;
+}
+
 function applyFilters(){
   const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=+document.getElementById('filterOvrMin').value||0,oMax=+document.getElementById('filterOvrMax').value||99,aMin=+document.getElementById('filterAgeMin').value||0,aMax=+document.getElementById('filterAgeMax').value||99;
   const assigned=getAssignedPlayerIds();
   const avail=allPlayers.filter(p=>{
     if(assigned.has(p.id))return false;
     if(nf&&!p.name.toLowerCase().includes(nf))return false;
-    if(pf&&!p.positions.split(',').map(s=>s.trim()).includes(pf))return false;
+    // Position filter: show any player whose OVR at the selected position is >= 95% of their primary OVR
+    if(pf){
+      const posOvr=getPosOvr(p,pf);
+      if(posOvr<Math.round(p.ovr*0.95))return false;
+    }
     if(p.ovr<oMin||p.ovr>oMax)return false;
     if(p.age<aMin||p.age>aMax)return false;
     if(upgradeFilterOn&&p.metadata){
@@ -625,21 +641,32 @@ function applyFilters(){
     }
     return true;
   });
+  // When a position is selected, sort by OVR at that position (highest first)
+  if(pf) avail.sort((a,b)=>getPosOvr(b,pf)-getPosOvr(a,pf));
   const body=document.getElementById('playerListBody');body.innerHTML='';
   avail.forEach(p=>{
     const div=document.createElement('div');div.className='player-row';
+    // Display OVR: position-specific when filtered, primary otherwise
+    const displayOvr=pf?getPosOvr(p,pf):p.ovr;
     // Position OVR chips
     const positions=p.metadata?p.metadata.positions:p.positions.split(',').map(s=>s.trim());
     const posChips=positions.map(pos=>{
-      const posOvr=p.metadata?ovrAtPosition(p.metadata,pos):p.ovr;
+      const posOvr=getPosOvr(p,pos);
       const isAlt=pos!==positions[0];
       const isUpgrade=isAlt&&posOvr>=p.ovr;
-      const chipBg=isUpgrade?'rgba(58,242,75,0.15)':'var(--bg-tertiary)';
+      const isFiltered=pf&&pos===pf;
+      const chipBg=isFiltered?'rgba(22,159,237,0.2)':isUpgrade?'rgba(58,242,75,0.15)':'var(--bg-tertiary)';
       return `<span class="pos-chip" style="background:${chipBg}"><span class="pos-chip__label">${pos}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
     }).join('');
+    // Also show filtered position chip if player doesn't officially play there
+    let extraChip='';
+    if(pf&&!positions.includes(pf)){
+      const posOvr=getPosOvr(p,pf);
+      extraChip=`<span class="pos-chip" style="background:rgba(22,159,237,0.2)"><span class="pos-chip__label">${pf}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
+    }
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(p.ovr)}">${p.ovr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age||''}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}${extraChip}</div>${statsH}<div class="pr-retire">${getRetireIcon(p.retireIn)}</div><div class="pr-age">${p.age||''}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
