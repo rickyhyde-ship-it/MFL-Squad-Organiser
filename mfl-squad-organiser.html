@@ -398,6 +398,7 @@ function mapApiPlayer(p) {
   const m = p.metadata || {};
   const positions = Array.isArray(m.positions) ? m.positions : [];
   if (!positions.length) return null;
+  if (m.retirementYears === 0) return null;
   const nat = Array.isArray(m.nationalities) ? m.nationalities[0] : (m.nationality || null);
   return {
     id: String(p.id),
