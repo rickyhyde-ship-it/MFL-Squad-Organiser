@@ -609,10 +609,10 @@ function renderPitch(section){
       div.addEventListener('dragend',()=>{div.classList.remove('dragging');dragSection=null;dragIdx=null;container.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));});
       const hasImg=!isL&&!!player?.id;
       const imgH=hasImg?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.closest('.pitch-slot-card').classList.remove('has-img')">`:'';
-      const ageH=(!isL&&player?.age)?`<div class="pitch-slot-age">${player.age}${getRetireIcon(player.retireIn)}</div>`:'';
       const penPct=(!isL&&top16Avg!==null)?getTrainingPenaltyPct(player.ovr-top16Avg):null;
-      const penH=penPct?`<div class="pitch-slot-pen">-${penPct}%</div>`:'';
-      div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}</div>${retH}${ageH}${penH}<div class="pitch-slot-pos">${pos}</div></div></div>`;
+      const penInline=penPct?`<span style="font-size:8px;color:var(--red);font-weight:700;margin-left:3px">-${penPct}%</span>`:'';
+      const ageLine=(!isL&&player?.age)?`<span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-left:3px">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
+      div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}${penInline}</div>${retH}<div class="pitch-slot-pos">${pos}${ageLine}</div></div></div>`;
       let _tc=0,_tt=null;div.addEventListener('click',()=>{_tc++;if(_tc===1)_tt=setTimeout(()=>{_tc=0;},600);if(_tc>=3){clearTimeout(_tt);_tc=0;removeFromSlot(section,i);}});
     }else{
       div.innerHTML=`<div class="pitch-slot-card empty" onclick="openAddPlayerForSlot('${section}',${i})"><div class="pitch-slot-pos">${pos}</div></div>`;
