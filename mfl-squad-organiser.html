@@ -154,6 +154,12 @@ body {
 .squad-player-entry .sp-name { flex: 1; }
 .squad-player-entry .sp-pos { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
 .squad-player-entry.loan-entry { color: var(--loan-accent); }
+.squad-avg-row { display:flex; gap:16px; padding:8px 8px 10px; border-bottom:1px solid var(--border); margin-bottom:2px; }
+.squad-avg-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.squad-avg-label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+.squad-avg-val { font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; }
+.squad-player-entry .sp-age { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); min-width:22px; text-align:center; }
+.squad-player-entry .sp-pen { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--red); min-width:36px; text-align:right; }
 .copied-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
 .copied-toast.show { opacity: 1; }
 
@@ -691,17 +697,53 @@ function confirmLoan(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)retu
 
 function renderSquadPlayerList(){
   const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;
-  const c=document.getElementById('squadPlayerList');let h='<div class="squad-player-list-title">Squad Players — click name to copy surname</div>';
+  const c=document.getElementById('squadPlayerList');
+
+  // Compute averages from all assigned players (primary OVR, sorted desc)
+  const allSlots=[...(sq.starters||[]),...(sq.backups||[])].filter(s=>s);
+  const ovrs=allSlots.map(slot=>{const p=slot.isLoan?slot:allPlayers.find(pl=>pl.id===slot.playerId);return p?p.ovr:null;}).filter(v=>v!==null).sort((a,b)=>b-a);
+  const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+  const top11Avg=avg(ovrs.slice(0,11));
+  const top16Avg=avg(ovrs.slice(0,16));
+  const allAvg=avg(ovrs);
+
+  let h='<div class="squad-player-list-title">Squad Players — click name to copy surname</div>';
+
+  if(ovrs.length>0){
+    h+='<div class="squad-avg-row">';
+    if(top11Avg!==null)h+=`<div class="squad-avg-item"><span class="squad-avg-label">Top 11</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(top11Avg))}">${Math.round(top11Avg)}</span></div>`;
+    if(top16Avg!==null&&ovrs.length>11)h+=`<div class="squad-avg-item"><span class="squad-avg-label">Top 16</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(top16Avg))}">${Math.round(top16Avg)}</span></div>`;
+    if(allAvg!==null)h+=`<div class="squad-avg-item"><span class="squad-avg-label">All ${ovrs.length}</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(allAvg))}">${Math.round(allAvg)}</span></div>`;
+    h+='</div>';
+  }
+
   [{key:'starters',label:'Starters'},{key:'backups',label:'Backups'}].forEach(({key,label})=>{
     const slots=sq[key]||[],filled=slots.filter(s=>s);if(!filled.length)return;
     h+=`<div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px">${label}</div>`;
-    filled.forEach(slot=>{const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);if(!player)return;const sn=player.name.split(' ').pop(),isL=slot.isLoan,{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
-    h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}${!isL?getRetireIcon(player.retireIn):''}</span><span class="sp-pos">${slot.slotPos}</span></div>`;});
-  });c.innerHTML=h;
+    filled.forEach(slot=>{
+      const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);if(!player)return;
+      const sn=player.name.split(' ').pop(),isL=slot.isLoan,{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
+      const ageH=(!isL&&player.age)?`<span class="sp-age">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
+      let penH='';
+      if(!isL&&top16Avg!==null){const diff=player.ovr-top16Avg;const pen=getTrainingPenaltyPct(diff);if(pen)penH=`<span class="sp-pen" title="OVR ${player.ovr} is ${(+diff.toFixed(1))} above top-16 avg">-${pen}%</span>`;}
+      h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}</span>${ageH}<span class="sp-pos">${slot.slotPos}</span>${penH}</div>`;
+    });
+  });
+  c.innerHTML=h;
 }
 
 function copySurname(n){navigator.clipboard.writeText(n).then(()=>{const t=document.getElementById('copiedToast');t.textContent='Copied: '+n;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);});}
 
+function getTrainingPenaltyPct(diff){
+  if(diff<2)return null;
+  if(diff>=20)return 50;
+  if(diff>=15)return 28;
+  if(diff>=10)return 13;
+  if(diff>=8)return 8;
+  if(diff>=6)return 5;
+  if(diff>=4)return 2;
+  return 1;
+}
 function getOvrColor(ovr){if(ovr>=85)return'#fa53ff';if(ovr>=75)return'#169fed';if(ovr>=65)return'#3af24b';if(ovr>=55)return'#ffcc00';return'#9f9f9f';}
 function getRetireHtml(r){if(r===null||r===undefined||r>3)return'';const c={0:'#ff0000',1:'#ff0000',2:'#ff9900',3:'#ffcc00'};return`<div class="pitch-slot-retire" style="color:${c[r]}">🎂 ${r}s</div>`;}
 function getRetireIcon(r){if(r===null||r===undefined||r>3)return'';const c={0:'#ff0000',1:'#ff0000',2:'#ff9900',3:'#ffcc00'};const tip=r===0?'Retiring this season':`${r} season${r>1?'s':''} remaining`;return`<span style="color:${c[r]};font-size:12px;line-height:1" title="${tip}">⚠</span>`;}
