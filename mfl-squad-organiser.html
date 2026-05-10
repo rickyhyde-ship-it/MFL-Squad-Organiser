@@ -158,7 +158,7 @@ body {
 .squad-avg-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
 .squad-avg-label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
 .squad-avg-val { font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; }
-.squad-player-entry .sp-age { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); min-width:22px; text-align:center; }
+.squad-player-entry .sp-age { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--yellow); min-width:22px; text-align:center; }
 .squad-player-entry .sp-pen { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--red); min-width:36px; text-align:right; }
 .pitch-slot-age { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); }
 .pitch-slot-pen { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; color:var(--red); }
@@ -611,7 +611,7 @@ function renderPitch(section){
       const imgH=hasImg?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.closest('.pitch-slot-card').classList.remove('has-img')">`:'';
       const penPct=(!isL&&top16Avg!==null)?getTrainingPenaltyPct(player.ovr-top16Avg):null;
       const penInline=penPct?`<span style="font-size:8px;color:var(--red);font-weight:700;margin-left:3px">-${penPct}%</span>`:'';
-      const ageLine=(!isL&&player?.age)?`<span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-left:3px">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
+      const ageLine=(!isL&&player?.age)?`<span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--yellow);margin-left:3px">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
       div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''}"><button class="pitch-slot-remove" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}${penInline}</div>${retH}<div class="pitch-slot-pos">${pos}${ageLine}</div></div></div>`;
       let _tc=0,_tt=null;div.addEventListener('click',()=>{_tc++;if(_tc===1)_tt=setTimeout(()=>{_tc=0;},600);if(_tc>=3){clearTimeout(_tt);_tc=0;removeFromSlot(section,i);}});
     }else{
@@ -730,11 +730,13 @@ function renderSquadPlayerList(){
     h+=`<div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px">${label}</div>`;
     filled.forEach(slot=>{
       const player=slot.isLoan?slot:allPlayers.find(p=>p.id===slot.playerId);if(!player)return;
-      const sn=player.name.split(' ').pop(),isL=slot.isLoan,{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
+      const sn=player.name.split(' ').pop(),isL=slot.isLoan;
+      const primaryOvr=isL?player.ovr:player.ovr; // always primary OVR for averages/penalties
+      const{ovr:dO}=getPlayerPosOvr(player,slot.slotPos);
       const ageH=(!isL&&player.age)?`<span class="sp-age">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
       let penH='';
-      if(!isL&&top16Avg!==null){const diff=player.ovr-top16Avg;const pen=getTrainingPenaltyPct(diff);if(pen)penH=`<span class="sp-pen" title="OVR ${player.ovr} is ${(+diff.toFixed(1))} above top-16 avg">-${pen}%</span>`;}
-      h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(dO)}">${dO}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}</span>${ageH}<span class="sp-pos">${slot.slotPos}</span>${penH}</div>`;
+      if(!isL&&top16Avg!==null){const diff=primaryOvr-top16Avg;const pen=getTrainingPenaltyPct(diff);if(pen)penH=`<span class="sp-pen" title="Primary OVR ${primaryOvr} is ${(+diff.toFixed(1))} above top-16 avg">-${pen}%</span>`;}
+      h+=`<div class="squad-player-entry ${isL?'loan-entry':''}" onclick="copySurname('${escAttr(sn)}')" title="Click to copy: ${escAttr(sn)}"><span class="sp-ovr" style="color:${getOvrColor(primaryOvr)}">${primaryOvr}</span><span class="sp-name">${escHtml(player.name)}${isL?' <span class="loan-badge">LOAN</span>':''}</span>${ageH}<span class="sp-pos">${slot.slotPos}</span>${penH}</div>`;
     });
   });
   c.innerHTML=h;
