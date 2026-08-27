@@ -713,7 +713,7 @@ body::after {
 }
 
 .division-select {
-  width: 64px;
+  width: 82px;
   height: 25px;
   padding: 2px 5px;
   border: 1px solid rgba(151,178,199,.22);
@@ -729,6 +729,49 @@ body::after {
 .division-select:focus-visible {
   border-color: rgba(192,132,252,.62);
   outline: none;
+}
+
+.squad-order-controls {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.squad-order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid rgba(151,178,199,.22);
+  border-radius: 4px;
+  background: rgba(7,19,29,.72);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.squad-order-btn:hover,
+.squad-order-btn:focus-visible {
+  border-color: rgba(192,132,252,.62);
+  color: #e9d5ff;
+  outline: none;
+}
+
+.squad-order-btn:disabled {
+  border-color: rgba(151,178,199,.1);
+  color: rgba(151,178,199,.25);
+  cursor: not-allowed;
+}
+
+.squad-list-item.dragging {
+  opacity: .48;
+}
+
+.squad-list-item.drag-over {
+  border-color: rgba(192,132,252,.72);
+  box-shadow: inset 0 0 0 1px rgba(192,132,252,.28);
 }
 
 .squad-count {
@@ -2146,6 +2189,7 @@ const ENERGY_SCHEDULE=[
   {day:33,training:false,league:true,cup:false}
 ];
 const DIVISION_MIN_OVR={1:88,2:85,3:82,4:78,5:74,6:70,7:65,8:56,9:46,10:null};
+const DIVISION_NAMES={1:'Diamond',2:'Plat',3:'Gold',4:'Silver',5:'Bronze',6:'Iron',7:'Stone',8:'Ice',9:'Spark',10:'Flint'};
 const viewerParams=new URLSearchParams(window.location.search);
 const viewerMode=viewerParams.get('viewer')==='1';
 const viewerListingId=/^\d+$/.test(viewerParams.get('listingId')||'')?viewerParams.get('listingId'):'';
@@ -2698,10 +2742,21 @@ function createSquadForClub(club) {
 }
 
 function sortSquads() {
+  const originalOrder = new Map(squads.map((squad, index) => [squad, index]));
   squads.sort((a, b) => {
     const divisionDiff = normalizeDivision(a?.division, 11) - normalizeDivision(b?.division, 11);
     if (divisionDiff) return divisionDiff;
-    return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' });
+    const aOrder = Number.isFinite(Number(a?.sortOrder)) && Number(a.sortOrder) >= 0 ? Number(a.sortOrder) : Number.MAX_SAFE_INTEGER;
+    const bOrder = Number.isFinite(Number(b?.sortOrder)) && Number(b.sortOrder) >= 0 ? Number(b.sortOrder) : Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    const nameDiff = String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' });
+    return nameDiff || originalOrder.get(a) - originalOrder.get(b);
+  });
+  const nextOrder = {};
+  squads.forEach(squad => {
+    const division = normalizeDivision(squad?.division);
+    squad.sortOrder = nextOrder[division] || 0;
+    nextOrder[division] = squad.sortOrder + 1;
   });
 }
 
@@ -2722,7 +2777,7 @@ function mergeOwnedClubs(ownedClubs, removeMissing=false) {
     squad.isOwnedClub = true;
     squad.name = club.name;
     squad.apiDivision = club.apiDivision;
-    if (!squad.divisionManual || normalizeDivision(squad.division) === club.apiDivision) {
+    if (squad.divisionManual !== true) {
       squad.division = club.division;
       squad.divisionManual = false;
     }
@@ -2937,20 +2992,32 @@ function setClubSyncStatus(message,isError=false){const el=document.getElementBy
 function showNoSquadMessage(message='Select or create a squad to get started'){activeSquadId=null;document.getElementById('squadContent').style.display='none';const empty=document.getElementById('noSquadMsg');empty.textContent=message;empty.style.display='flex';}
 function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),division:10,divisionManual:true,completed:false,startersFormation:'',backupsFormation:'',starters:[],backups:[],substitutes:[],loans:[],energyDrains:{}});sortSquads();renderSquadList();selectSquad(id);autoSave();}
 function deleteSquad(id){if(!confirm('Delete this club and its saved squad?'))return;squads=squads.filter(s=>s.id!==id);if(activeSquadId===id)showNoSquadMessage();renderSquadList();renderPoolSummary();autoSave();}
-function divisionOptions(selected){let options='';for(let division=1;division<=10;division++)options+=`<option value="${division}"${division===selected?' selected':''}>Div ${division}</option>`;return options;}
-function changeSquadDivision(id,value){const squad=squads.find(item=>item.id===id);if(!squad)return;squad.division=normalizeDivision(value);squad.divisionManual=squad.division!==normalizeDivision(squad.apiDivision,squad.division);sortSquads();renderSquadList();if(id===activeSquadId)updateSquadSizeCounter();autoSave();}
+function divisionOptions(selected){let options='';for(let division=1;division<=10;division++)options+=`<option value="${division}"${division===selected?' selected':''}>${DIVISION_NAMES[division]}</option>`;return options;}
+function changeSquadDivision(id,value){const squad=squads.find(item=>item.id===id);if(!squad)return;squad.division=normalizeDivision(value);squad.divisionManual=true;delete squad.sortOrder;sortSquads();renderSquadList();if(id===activeSquadId)updateSquadSizeCounter();autoSave();}
+function moveSquadWithinDivision(id,direction){sortSquads();const squad=squads.find(item=>item.id===id);if(!squad)return;const division=normalizeDivision(squad.division),group=squads.filter(item=>normalizeDivision(item.division)===division),index=group.indexOf(squad),target=index+direction;if(index<0||target<0||target>=group.length)return;[group[index],group[target]]=[group[target],group[index]];group.forEach((item,order)=>{item.sortOrder=order;});sortSquads();renderSquadList();autoSave();}
+function reorderSquadWithinDivision(draggedId,targetId,placeAfter){sortSquads();const dragged=squads.find(item=>item.id===draggedId),target=squads.find(item=>item.id===targetId);if(!dragged||!target||dragged===target||normalizeDivision(dragged.division)!==normalizeDivision(target.division))return;const division=normalizeDivision(dragged.division),group=squads.filter(item=>normalizeDivision(item.division)===division),from=group.indexOf(dragged);group.splice(from,1);const to=group.indexOf(target)+(placeAfter?1:0);group.splice(to,0,dragged);group.forEach((item,order)=>{item.sortOrder=order;});sortSquads();renderSquadList();autoSave();}
 function toggleSquadComplete(id){const squad=squads.find(item=>item.id===id);if(!squad)return;squad.completed=!squad.completed;renderSquadList();autoSave();}
 function renderSquadList(){
   const c=document.getElementById('squadList');c.innerHTML='';if(viewerMode)return;sortSquads();
+  let draggedSquadId=null;
   squads.forEach(sq=>{
     const n=squadPlayerCount(sq),division=normalizeDivision(sq.division);
+    const divisionSquads=squads.filter(item=>normalizeDivision(item.division)===division),divisionIndex=divisionSquads.indexOf(sq),canMoveUp=divisionIndex>0,canMoveDown=divisionIndex<divisionSquads.length-1;
     const completed=sq.completed===true;
     const d=document.createElement('div');
     d.className=`squad-list-item${sq.id===activeSquadId?' active':''}${completed?' completed':''}`;
-    d.innerHTML=`<div class="squad-list-main"><span class="squad-list-name" title="${escHtml(sq.name)}">${escHtml(sq.name)}</span><div class="squad-list-meta"><select class="division-select" aria-label="Division for ${escHtml(sq.name)}">${divisionOptions(division)}</select><span class="squad-count" title="${n} unique assigned player${n===1?'':'s'}">${n}</span></div></div><div class="squad-list-actions"><button type="button" class="squad-complete-btn" aria-label="Mark ${escHtml(sq.name)} ${completed?'incomplete':'complete'}" aria-pressed="${completed}" title="${completed?'Mark squad incomplete':'Mark squad complete'}">&#10003;</button><button type="button" class="squad-delete-btn" aria-label="Delete ${escHtml(sq.name)}">&times;</button></div>`;
+    d.draggable=true;
+    d.innerHTML=`<div class="squad-list-main"><span class="squad-list-name" title="${escHtml(sq.name)} — drag to reorder within ${DIVISION_NAMES[division]}">${escHtml(sq.name)}</span><div class="squad-list-meta"><select class="division-select" aria-label="Division for ${escHtml(sq.name)}">${divisionOptions(division)}</select><span class="squad-count" title="${n} unique assigned player${n===1?'':'s'}">${n}</span><span class="squad-order-controls"><button type="button" class="squad-order-btn squad-order-up" aria-label="Move ${escHtml(sq.name)} up within ${DIVISION_NAMES[division]}" title="Move up within ${DIVISION_NAMES[division]}"${canMoveUp?'':' disabled'}>&uarr;</button><button type="button" class="squad-order-btn squad-order-down" aria-label="Move ${escHtml(sq.name)} down within ${DIVISION_NAMES[division]}" title="Move down within ${DIVISION_NAMES[division]}"${canMoveDown?'':' disabled'}>&darr;</button></span></div></div><div class="squad-list-actions"><button type="button" class="squad-complete-btn" aria-label="Mark ${escHtml(sq.name)} ${completed?'incomplete':'complete'}" aria-pressed="${completed}" title="${completed?'Mark squad incomplete':'Mark squad complete'}">&#10003;</button><button type="button" class="squad-delete-btn" aria-label="Delete ${escHtml(sq.name)}">&times;</button></div>`;
     const divisionSelect=d.querySelector('.division-select');divisionSelect.addEventListener('click',e=>e.stopPropagation());divisionSelect.addEventListener('change',e=>{e.stopPropagation();changeSquadDivision(sq.id,e.target.value);});
+    d.querySelector('.squad-order-up').addEventListener('click',e=>{e.stopPropagation();moveSquadWithinDivision(sq.id,-1);});
+    d.querySelector('.squad-order-down').addEventListener('click',e=>{e.stopPropagation();moveSquadWithinDivision(sq.id,1);});
     d.querySelector('.squad-complete-btn').addEventListener('click',e=>{e.stopPropagation();toggleSquadComplete(sq.id);});
     d.querySelector('.squad-delete-btn').addEventListener('click',e=>{e.stopPropagation();deleteSquad(sq.id);});
+    d.addEventListener('dragstart',e=>{if(e.target.closest('button,select')){e.preventDefault();return;}draggedSquadId=sq.id;d.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',sq.id);});
+    d.addEventListener('dragover',e=>{const dragged=squads.find(item=>item.id===draggedSquadId);if(!dragged||dragged.id===sq.id||normalizeDivision(dragged.division)!==division)return;e.preventDefault();e.dataTransfer.dropEffect='move';d.classList.add('drag-over');});
+    d.addEventListener('dragleave',()=>d.classList.remove('drag-over'));
+    d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('drag-over');const rect=d.getBoundingClientRect();reorderSquadWithinDivision(draggedSquadId,sq.id,e.clientY>rect.top+rect.height/2);});
+    d.addEventListener('dragend',()=>{draggedSquadId=null;document.querySelectorAll('.squad-list-item.dragging,.squad-list-item.drag-over').forEach(item=>item.classList.remove('dragging','drag-over'));});
     d.addEventListener('click',()=>selectSquad(sq.id));c.appendChild(d);
   });
 }
