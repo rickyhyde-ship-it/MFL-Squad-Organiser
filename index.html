@@ -2475,14 +2475,21 @@ function normalizeEnergyDrain(value){
   return Math.round(Math.min(20,Math.max(0,numeric))*10)/10;
 }
 
-function energyDrainFor(squad,slot,index){
+function defaultEnergyDrainFor(player){
+  const retirementYears=projectedRetirementYears(player?.retireIn);
+  if(retirementYears===1)return 7;
+  if(retirementYears===2)return 5;
+  return ENERGY_DEFAULT_DRAIN;
+}
+
+function energyDrainFor(squad,slot,index,player=playerForSlot(slot)){
   squad.energyDrains=squad.energyDrains&&typeof squad.energyDrains==='object'?squad.energyDrains:{};
   const key=energyPlayerKey(slot,index);
-  return Object.prototype.hasOwnProperty.call(squad.energyDrains,key)?normalizeEnergyDrain(squad.energyDrains[key]):ENERGY_DEFAULT_DRAIN;
+  return Object.prototype.hasOwnProperty.call(squad.energyDrains,key)?normalizeEnergyDrain(squad.energyDrains[key]):defaultEnergyDrainFor(player);
 }
 
 function getEnergyStarters(squad){
-  return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>({...entry,key:energyPlayerKey(entry.slot,entry.index),drain:energyDrainFor(squad,entry.slot,entry.index)}));
+  return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>({...entry,key:energyPlayerKey(entry.slot,entry.index),drain:energyDrainFor(squad,entry.slot,entry.index,entry.player)}));
 }
 
 function calculateEnergyProjection(starters){
