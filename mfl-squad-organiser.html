@@ -214,6 +214,22 @@ body {
 .filter-select:focus { border-color: var(--accent); }
 .filter-small { width: 60px; }
 .filter-label { font-size: 11px; color: var(--text-muted); }
+.retirement-filters { display:inline-flex; align-items:center; gap:4px; padding:4px 6px; border:1px solid var(--border); border-radius:7px; background:rgba(10,14,19,.26); }
+.retirement-filter { display:inline-flex; align-items:center; gap:4px; min-height:24px; padding:2px 5px; border-radius:4px; color:var(--text-secondary); font-size:10px; white-space:nowrap; cursor:pointer; transition:background .15s,color .15s; }
+.retirement-filter:hover { background:var(--bg-hover); color:var(--text-primary); }
+.retirement-filter input { width:13px; height:13px; margin:0; cursor:pointer; }
+.retirement-filter--none input { accent-color:var(--text-secondary); }
+.retirement-filter--yellow input { accent-color:var(--yellow); }
+.retirement-filter--orange input { accent-color:var(--orange); }
+.retirement-filter--red input { accent-color:var(--red); }
+.retirement-filter__dot { width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 5px currentColor; }
+.retirement-filter--none .retirement-filter__dot { color:var(--text-muted); box-shadow:none; }
+.retirement-filter--yellow .retirement-filter__dot { color:var(--yellow); }
+.retirement-filter--orange .retirement-filter__dot { color:var(--orange); }
+.retirement-filter--red .retirement-filter__dot { color:var(--red); }
+.filter-clear { appearance:none; min-height:30px; padding:5px 9px; border:1px solid var(--border-light); border-radius:6px; background:transparent; color:var(--text-secondary); font:600 10px 'JetBrains Mono',monospace; cursor:pointer; white-space:nowrap; transition:border-color .15s,color .15s,background .15s; }
+.filter-clear:hover { border-color:var(--accent); background:var(--accent-glow); color:var(--text-primary); }
+.filter-clear:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .player-table-header { display:flex; align-items:center; gap:6px; padding:6px 20px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
 .sort-header { appearance:none; min-width:0; padding:2px 0; border:0; background:transparent; color:inherit; font:inherit; text-transform:inherit; letter-spacing:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
 .sort-header:hover { color:var(--text-primary); }
@@ -2117,6 +2133,8 @@ button.substitute-card:not(.is-filled):focus-visible {
       <span class="filter-range"><span class="filter-label">Age</span><input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" aria-label="Minimum age" oninput="applyFilters()"><input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" aria-label="Maximum age" oninput="applyFilters()"></span>
       <span class="filter-range"><span class="filter-label">Seasons</span><input class="filter-input filter-small" id="filterSeasonsMin" type="number" min="1" step="1" placeholder="Min" aria-label="Minimum seasons in game" oninput="applyFilters()"><input class="filter-input filter-small" id="filterSeasonsMax" type="number" min="1" step="1" placeholder="Max" aria-label="Maximum seasons in game" oninput="applyFilters()"></span>
       <span class="filter-range"><span class="filter-label">Progression</span><input class="filter-input filter-small" id="filterProgressionMin" type="number" step="1" placeholder="Min" aria-label="Minimum all-time OVR progression" oninput="applyFilters()"><input class="filter-input filter-small" id="filterProgressionMax" type="number" step="1" placeholder="Max" aria-label="Maximum all-time OVR progression" oninput="applyFilters()"></span>
+      <div class="retirement-filters" role="group" aria-label="Exclude players by retirement notice"><span class="filter-label">Exclude</span><label class="retirement-filter retirement-filter--none"><input id="filterRetirementNone" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>No notice</label><label class="retirement-filter retirement-filter--yellow"><input id="filterRetirementYellow" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Yellow</label><label class="retirement-filter retirement-filter--orange"><input id="filterRetirementOrange" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Orange</label><label class="retirement-filter retirement-filter--red"><input id="filterRetirementRed" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Red</label></div>
+      <button type="button" class="filter-clear" onclick="clearPlayerFilters()">Clear all filters</button>
       <span id="filterCount" role="status" aria-live="polite" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
       <button id="btnUpgrade" onclick="toggleUpgradeFilter()" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:all 0.15s;" title="Show players whose OVR at an alternate position equals or exceeds their primary OVR">Alt Upgrade</button>
     </div>
@@ -3240,12 +3258,25 @@ function openAddSubstituteForSlot(idx){addPlayerTarget='substitutes';addPlayerSl
 function openAddPlayerModal(section){addPlayerTarget=section;if(addPlayerSlotIdx===null)document.getElementById('modalSlotInfo').textContent=`→ ${section}`;document.getElementById('addPlayerModal').classList.add('open');applyFilters();}
 function closeAddPlayerModal(){document.getElementById('addPlayerModal').classList.remove('open');addPlayerSlotIdx=null;}
 
-function toggleUpgradeFilter(){
-  upgradeFilterOn=!upgradeFilterOn;
+function updateUpgradeFilterButton(){
   const btn=document.getElementById('btnUpgrade');
   btn.style.background=upgradeFilterOn?'var(--accent)':'var(--bg-tertiary)';
   btn.style.color=upgradeFilterOn?'#fff':'var(--text-secondary)';
   btn.style.borderColor=upgradeFilterOn?'var(--accent)':'var(--border-light)';
+}
+
+function toggleUpgradeFilter(){
+  upgradeFilterOn=!upgradeFilterOn;
+  updateUpgradeFilterButton();
+  applyFilters();
+}
+
+function clearPlayerFilters(){
+  ['filterName','filterOvrMin','filterOvrMax','filterAgeMin','filterAgeMax','filterSeasonsMin','filterSeasonsMax','filterProgressionMin','filterProgressionMax'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('filterPos').value='';
+  ['filterRetirementNone','filterRetirementYellow','filterRetirementOrange','filterRetirementRed'].forEach(id=>{document.getElementById(id).checked=false;});
+  upgradeFilterOn=false;
+  updateUpgradeFilterButton();
   applyFilters();
 }
 
@@ -3268,6 +3299,14 @@ function projectedPlayerSeasons(player){
 function playerProgression(player){
   const progression=Number(player.careerProgression?.overall);
   return Number.isFinite(progression)?progression:null;
+}
+
+function retirementNoticeLevel(player){
+  const years=projectedRetirementYears(player.retireIn);
+  if(years===0||years===1)return'red';
+  if(years===2)return'orange';
+  if(years===3)return'yellow';
+  return'none';
 }
 
 function setPlayerSort(key){
@@ -3329,6 +3368,7 @@ function playerCanBeSelectedForTarget(player,squad,target){
 
 function applyFilters(){
   const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=readOptionalNumber('filterOvrMin')??0,oMax=readOptionalNumber('filterOvrMax')??99,aMin=readOptionalNumber('filterAgeMin')??0,aMax=readOptionalNumber('filterAgeMax')??99,seasonsMin=readOptionalNumber('filterSeasonsMin'),seasonsMax=readOptionalNumber('filterSeasonsMax'),progressionMin=readOptionalNumber('filterProgressionMin'),progressionMax=readOptionalNumber('filterProgressionMax');
+  const excludedRetirementNotices=new Set([['none','filterRetirementNone'],['yellow','filterRetirementYellow'],['orange','filterRetirementOrange'],['red','filterRetirementRed']].filter(([,id])=>document.getElementById(id).checked).map(([notice])=>notice));
   const sq=activeSquad();
   const avail=allPlayers.filter(p=>{
     if(isPlayerIgnoredNextSeason(p))return false;
@@ -3344,6 +3384,7 @@ function applyFilters(){
     if(p.age<aMin||p.age>aMax)return false;
     if(seasonsMin!==null||seasonsMax!==null){const seasons=projectedPlayerSeasons(p);if(seasons===null||(seasonsMin!==null&&seasons<seasonsMin)||(seasonsMax!==null&&seasons>seasonsMax))return false;}
     if(progressionMin!==null||progressionMax!==null){const progression=playerProgression(p);if(progression===null||(progressionMin!==null&&progression<progressionMin)||(progressionMax!==null&&progression>progressionMax))return false;}
+    if(excludedRetirementNotices.has(retirementNoticeLevel(p)))return false;
     if(upgradeFilterOn&&p.metadata){
       const hasUpgrade=POSITION_ORDER.some(pos=>pos!==p.metadata.positions[0]&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95));
       if(!hasUpgrade)return false;
