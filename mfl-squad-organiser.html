@@ -205,6 +205,8 @@ body {
 .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0 4px; }
 .modal-close:hover { color: var(--text-primary); }
 .modal-filters { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filter-range { display: inline-flex; align-items: center; gap: 6px; }
+.filter-range .filter-label { white-space: nowrap; }
 .filter-input { font-family: 'DM Sans', sans-serif; background: var(--bg-tertiary); border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; width: 160px; }
 .filter-input:focus { border-color: var(--accent); }
 .filter-input::placeholder { color: var(--text-muted); }
@@ -212,6 +214,21 @@ body {
 .filter-select:focus { border-color: var(--accent); }
 .filter-small { width: 60px; }
 .filter-label { font-size: 11px; color: var(--text-muted); }
+.player-table-header { display:flex; align-items:center; gap:6px; padding:6px 20px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+.sort-header { appearance:none; min-width:0; padding:2px 0; border:0; background:transparent; color:inherit; font:inherit; text-transform:inherit; letter-spacing:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+.sort-header:hover { color:var(--text-primary); }
+.sort-header:focus-visible { color:var(--text-primary); outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+.sort-header[aria-sort='ascending'],.sort-header[aria-sort='descending'] { color:var(--accent); }
+.sort-indicator { width:8px; color:var(--accent); font-size:9px; line-height:1; }
+.sort-header--ovr { width:30px; justify-content:center; }
+.sort-header--name { flex:1; }
+.sort-header--position { min-width:110px; }
+.sort-header--progression { width:48px; justify-content:center; }
+.sort-header--seasons { width:46px; justify-content:center; }
+.sort-header--stat { width:24px; justify-content:center; }
+.sort-header--age { width:46px; justify-content:center; }
+.sort-header--nationality { width:70px; justify-content:flex-end; }
+.player-table-stat-headers { width:160px; display:flex; gap:2px; }
 .modal-body { flex: 1; overflow-y: auto; padding: 0; }
 .player-row { display: flex; align-items: center; padding: 7px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; font-size: 13px; gap: 6px; }
 .player-row:hover { background: var(--bg-hover); }
@@ -2096,19 +2113,15 @@ button.substitute-card:not(.is-filled):focus-visible {
     <div class="modal-filters">
       <input class="filter-input" id="filterName" placeholder="Search name..." oninput="applyFilters()">
       <select class="filter-select" id="filterPos" onchange="applyFilters()"><option value="">All Positions</option></select>
-      <label class="filter-label">OVR</label>
-      <input class="filter-input filter-small" id="filterOvrMin" type="number" placeholder="Min" oninput="applyFilters()">
-      <input class="filter-input filter-small" id="filterOvrMax" type="number" placeholder="Max" oninput="applyFilters()">
-      <label class="filter-label">Age</label>
-      <input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" oninput="applyFilters()">
-      <input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" oninput="applyFilters()">
-      <label class="filter-label" for="filterSeasonsMax">Seasons</label>
-      <input class="filter-input filter-small" id="filterSeasonsMax" type="number" min="1" step="1" placeholder="Max" aria-label="Maximum seasons in game" oninput="applyFilters()">
-      <span id="filterCount" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
+      <span class="filter-range"><span class="filter-label">OVR</span><input class="filter-input filter-small" id="filterOvrMin" type="number" placeholder="Min" aria-label="Minimum OVR" oninput="applyFilters()"><input class="filter-input filter-small" id="filterOvrMax" type="number" placeholder="Max" aria-label="Maximum OVR" oninput="applyFilters()"></span>
+      <span class="filter-range"><span class="filter-label">Age</span><input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" aria-label="Minimum age" oninput="applyFilters()"><input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" aria-label="Maximum age" oninput="applyFilters()"></span>
+      <span class="filter-range"><span class="filter-label">Seasons</span><input class="filter-input filter-small" id="filterSeasonsMin" type="number" min="1" step="1" placeholder="Min" aria-label="Minimum seasons in game" oninput="applyFilters()"><input class="filter-input filter-small" id="filterSeasonsMax" type="number" min="1" step="1" placeholder="Max" aria-label="Maximum seasons in game" oninput="applyFilters()"></span>
+      <span class="filter-range"><span class="filter-label">Progression</span><input class="filter-input filter-small" id="filterProgressionMin" type="number" step="1" placeholder="Min" aria-label="Minimum all-time OVR progression" oninput="applyFilters()"><input class="filter-input filter-small" id="filterProgressionMax" type="number" step="1" placeholder="Max" aria-label="Maximum all-time OVR progression" oninput="applyFilters()"></span>
+      <span id="filterCount" role="status" aria-live="polite" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
       <button id="btnUpgrade" onclick="toggleUpgradeFilter()" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:all 0.15s;" title="Show players whose OVR at an alternate position equals or exceeds their primary OVR">Alt Upgrade</button>
     </div>
-    <div style="display:flex;align-items:center;padding:6px 20px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;gap:6px">
-      <div style="width:30px;text-align:center">OVR</div><div style="flex:1">Name</div><div style="min-width:110px">Pos / OVR</div><div style="width:48px;text-align:center">All Δ</div><div style="width:46px;text-align:center">Seasons</div><div style="width:160px;display:flex;gap:2px"><div style="width:24px;text-align:center">PAC</div><div style="width:24px;text-align:center">DRI</div><div style="width:24px;text-align:center">PAS</div><div style="width:24px;text-align:center">SHO</div><div style="width:24px;text-align:center">DEF</div><div style="width:24px;text-align:center">PHY</div></div><div style="width:20px"></div><div style="width:26px;text-align:center">Age</div><div style="width:70px;text-align:right">Nat</div>
+    <div class="player-table-header" aria-label="Player sort controls">
+      <button class="sort-header sort-header--ovr" type="button" data-sort="ovr" onclick="setPlayerSort('ovr')">OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--name" type="button" data-sort="name" onclick="setPlayerSort('name')">Name<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--position" type="button" data-sort="position" onclick="setPlayerSort('position')">Pos / OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--progression" type="button" data-sort="progression" onclick="setPlayerSort('progression')">All Δ<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--seasons" type="button" data-sort="seasons" onclick="setPlayerSort('seasons')">Seasons<span class="sort-indicator" aria-hidden="true"></span></button><div class="player-table-stat-headers"><button class="sort-header sort-header--stat" type="button" data-sort="pace" onclick="setPlayerSort('pace')">PAC<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="dribbling" onclick="setPlayerSort('dribbling')">DRI<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="passing" onclick="setPlayerSort('passing')">PAS<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="shooting" onclick="setPlayerSort('shooting')">SHO<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="defense" onclick="setPlayerSort('defense')">DEF<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="physical" onclick="setPlayerSort('physical')">PHY<span class="sort-indicator" aria-hidden="true"></span></button></div><button class="sort-header sort-header--age" type="button" data-sort="age" onclick="setPlayerSort('age')">Age<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--nationality" type="button" data-sort="nationality" onclick="setPlayerSort('nationality')">Nat<span class="sort-indicator" aria-hidden="true"></span></button>
     </div>
     <div class="modal-body" id="playerListBody"></div>
   </div>
@@ -2143,6 +2156,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 <script>
 let allPlayers=[], squads=[], activeSquadId=null, addPlayerTarget='starters', addPlayerSlotIdx=null;
 let dragSection=null, dragIdx=null, upgradeFilterOn=false, loanLookupPlayer=null, nextSeasonMode=false;
+let playerSortKey='ovr',playerSortDirection='desc';
 let pendingCoverPlayerId=null;
 let clubsInitialized=false;
 let careerScanWallet='',careerScanning=false,careerScanStop=false,careerScanForce=false;
@@ -3241,13 +3255,80 @@ function getPosOvr(p, pos) {
   return p.ovr;
 }
 
+function readOptionalNumber(id){
+  const value=document.getElementById(id).value;
+  return value===''?null:Number(value);
+}
+
+function projectedPlayerSeasons(player){
+  const seasons=Number(player.seasonsInGame);
+  return Number.isFinite(seasons)&&seasons>=1?seasons+(isNextSeasonMode()?1:0):null;
+}
+
+function playerProgression(player){
+  const progression=Number(player.careerProgression?.overall);
+  return Number.isFinite(progression)?progression:null;
+}
+
+function setPlayerSort(key){
+  const textColumns=new Set(['name','position','nationality']);
+  if(playerSortKey===key)playerSortDirection=playerSortDirection==='asc'?'desc':'asc';
+  else{playerSortKey=key;playerSortDirection=textColumns.has(key)?'asc':'desc';}
+  applyFilters();
+}
+
+function updatePlayerSortHeaders(){
+  document.querySelectorAll('.sort-header[data-sort]').forEach(header=>{
+    const active=header.dataset.sort===playerSortKey;
+    header.setAttribute('aria-sort',active?(playerSortDirection==='asc'?'ascending':'descending'):'none');
+    header.title=active?`Sorted ${playerSortDirection==='asc'?'ascending':'descending'}; activate to reverse`:'Activate to sort this column';
+    const indicator=header.querySelector('.sort-indicator');
+    if(indicator)indicator.textContent=active?(playerSortDirection==='asc'?'▲':'▼'):'';
+  });
+}
+
+function playerSortValue(player,key,positionFilter){
+  const stats=player.stats||{};
+  switch(key){
+    case'ovr':return Number(positionFilter?getPosOvr(player,positionFilter):player.ovr);
+    case'name':return player.name||'';
+    case'position':return (player.metadata?.positions?.[0]||String(player.positions||'').split(',')[0]||'').trim();
+    case'progression':return playerProgression(player);
+    case'seasons':return projectedPlayerSeasons(player);
+    case'pace':return Number(stats.pace);
+    case'dribbling':return Number(stats.defending1);
+    case'passing':return Number(stats.passing);
+    case'shooting':return Number(stats.shooting);
+    case'defense':return Number(stats.defending2);
+    case'physical':return Number(stats.physical);
+    case'age':return player.age===null||player.age===undefined||player.age===''?null:Number(player.age);
+    case'nationality':return formatNat(player.nationality);
+    default:return Number(player.ovr);
+  }
+}
+
+function sortPlayersForModal(players,positionFilter){
+  const direction=playerSortDirection==='asc'?1:-1;
+  players.sort((a,b)=>{
+    const aValue=playerSortValue(a,playerSortKey,positionFilter),bValue=playerSortValue(b,playerSortKey,positionFilter);
+    const aMissing=aValue===null||aValue===undefined||(typeof aValue==='number'&&!Number.isFinite(aValue));
+    const bMissing=bValue===null||bValue===undefined||(typeof bValue==='number'&&!Number.isFinite(bValue));
+    if(aMissing!==bMissing)return aMissing?1:-1;
+    let comparison=0;
+    if(!aMissing)comparison=typeof aValue==='string'?aValue.localeCompare(String(bValue),undefined,{numeric:true,sensitivity:'base'}):aValue-bValue;
+    if(comparison)return comparison*direction;
+    const ovrDifference=Number(b.ovr||0)-Number(a.ovr||0);
+    return ovrDifference||String(a.name||'').localeCompare(String(b.name||''),undefined,{sensitivity:'base'});
+  });
+}
+
 function playerCanBeSelectedForTarget(player,squad,target){
   const id=player.id;
   return !squads.some(item=>['starters','backups','substitutes'].some(section=>sectionHasPlayer(item,section,id)));
 }
 
 function applyFilters(){
-  const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=+document.getElementById('filterOvrMin').value||0,oMax=+document.getElementById('filterOvrMax').value||99,aMin=+document.getElementById('filterAgeMin').value||0,aMax=+document.getElementById('filterAgeMax').value||99,seasonsMaxRaw=document.getElementById('filterSeasonsMax').value,seasonsMax=seasonsMaxRaw===''?null:Number(seasonsMaxRaw);
+  const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=readOptionalNumber('filterOvrMin')??0,oMax=readOptionalNumber('filterOvrMax')??99,aMin=readOptionalNumber('filterAgeMin')??0,aMax=readOptionalNumber('filterAgeMax')??99,seasonsMin=readOptionalNumber('filterSeasonsMin'),seasonsMax=readOptionalNumber('filterSeasonsMax'),progressionMin=readOptionalNumber('filterProgressionMin'),progressionMax=readOptionalNumber('filterProgressionMax');
   const sq=activeSquad();
   const avail=allPlayers.filter(p=>{
     if(isPlayerIgnoredNextSeason(p))return false;
@@ -3261,15 +3342,16 @@ function applyFilters(){
     }
     if(p.ovr<oMin||p.ovr>oMax)return false;
     if(p.age<aMin||p.age>aMax)return false;
-    if(seasonsMax!==null){const seasons=Number(p.seasonsInGame);if(!Number.isFinite(seasons)||(seasons+(isNextSeasonMode()?1:0))>seasonsMax)return false;}
+    if(seasonsMin!==null||seasonsMax!==null){const seasons=projectedPlayerSeasons(p);if(seasons===null||(seasonsMin!==null&&seasons<seasonsMin)||(seasonsMax!==null&&seasons>seasonsMax))return false;}
+    if(progressionMin!==null||progressionMax!==null){const progression=playerProgression(p);if(progression===null||(progressionMin!==null&&progression<progressionMin)||(progressionMax!==null&&progression>progressionMax))return false;}
     if(upgradeFilterOn&&p.metadata){
       const hasUpgrade=POSITION_ORDER.some(pos=>pos!==p.metadata.positions[0]&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95));
       if(!hasUpgrade)return false;
     }
     return true;
   });
-  // When a position is selected, sort by OVR at that position (highest first)
-  if(pf) avail.sort((a,b)=>getPosOvr(b,pf)-getPosOvr(a,pf));
+  sortPlayersForModal(avail,pf);
+  updatePlayerSortHeaders();
   const body=document.getElementById('playerListBody');body.innerHTML='';
   avail.forEach(p=>{
     const div=document.createElement('div');div.className='player-row';
