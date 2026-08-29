@@ -230,6 +230,14 @@ body {
 .filter-clear { appearance:none; min-height:30px; padding:5px 9px; border:1px solid var(--border-light); border-radius:6px; background:transparent; color:var(--text-secondary); font:600 10px 'JetBrains Mono',monospace; cursor:pointer; white-space:nowrap; transition:border-color .15s,color .15s,background .15s; }
 .filter-clear:hover { border-color:var(--accent); background:var(--accent-glow); color:var(--text-primary); }
 .filter-clear:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.alt-upgrade-button { margin-left:auto; min-height:30px; padding:5px 10px; border:1px solid var(--border-light); border-radius:6px; background:var(--bg-tertiary); color:var(--text-secondary); font:600 11px 'JetBrains Mono',monospace; cursor:pointer; white-space:nowrap; transition:all .15s; }
+.alt-upgrade-button:hover { border-color:var(--accent); color:var(--text-primary); }
+.alt-upgrade-button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.alt-upgrade-controls { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:4px 7px; border:1px solid rgba(168,85,247,.35); border-radius:6px 6px 6px 2px; background:rgba(168,85,247,.09); }
+.alt-upgrade-controls[hidden] { display:none; }
+.alt-upgrade-threshold { display:inline-flex; align-items:center; gap:3px; color:var(--text-secondary); font:600 11px 'JetBrains Mono',monospace; }
+.alt-upgrade-threshold .filter-input { width:58px; padding-block:4px; text-align:right; }
+#addPlayerModal .modal { max-width:1080px; }
 .player-table-header { display:flex; align-items:center; gap:6px; padding:6px 20px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
 .sort-header { appearance:none; min-width:0; padding:2px 0; border:0; background:transparent; color:inherit; font:inherit; text-transform:inherit; letter-spacing:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
 .sort-header:hover { color:var(--text-primary); }
@@ -238,7 +246,8 @@ body {
 .sort-indicator { width:8px; color:var(--accent); font-size:9px; line-height:1; }
 .sort-header--ovr { width:30px; justify-content:center; }
 .sort-header--name { flex:1; }
-.sort-header--position { min-width:110px; }
+.sort-header--position { width:96px; flex:0 0 96px; }
+.player-table-header__other-position { width:180px; flex:0 0 180px; }
 .sort-header--progression { width:48px; justify-content:center; }
 .sort-header--seasons { width:46px; justify-content:center; }
 .sort-header--stat { width:24px; justify-content:center; }
@@ -250,7 +259,9 @@ body {
 .player-row:hover { background: var(--bg-hover); }
 .pr-ovr { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; width: 30px; text-align: center; }
 .pr-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pr-pos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; min-width:110px; max-width:200px; }
+.pr-pos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; min-width:0; }
+.pr-pos--main { width:96px; flex:0 0 96px; }
+.pr-pos--other { width:180px; flex:0 0 180px; }
 .pos-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 5px; border-radius:4px; background:var(--bg-tertiary); font-family:'JetBrains Mono',monospace; font-size:10px; white-space:nowrap; }
 .pos-chip__label { color:var(--text-muted); }
 .pos-chip__ovr { font-weight:700; }
@@ -1697,6 +1708,10 @@ button.substitute-card:not(.is-filled):focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .alt-upgrade-button { margin-left:0; }
+
+  .alt-upgrade-controls { justify-content:space-between; }
+
   .filter-input,
   .filter-select,
   .filter-small {
@@ -1714,9 +1729,24 @@ button.substitute-card:not(.is-filled):focus-visible {
   .pr-stats {
     max-width: none;
     width: 100%;
+    flex-basis:100%;
     min-width: 0;
     overflow-x: auto;
   }
+
+  .player-table-header { display:none; }
+
+  .pr-pos::before {
+    width:72px;
+    flex:0 0 72px;
+    color:var(--text-muted);
+    font:600 9px 'JetBrains Mono',monospace;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+  }
+
+  .pr-pos--main::before { content:'Main pos'; }
+  .pr-pos--other::before { content:'Other pos'; }
 
   .loan-form { padding: 14px; }
 
@@ -2136,10 +2166,11 @@ button.substitute-card:not(.is-filled):focus-visible {
       <div class="retirement-filters" role="group" aria-label="Exclude players by retirement notice"><span class="filter-label">Exclude</span><label class="retirement-filter retirement-filter--none"><input id="filterRetirementNone" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>No notice</label><label class="retirement-filter retirement-filter--yellow"><input id="filterRetirementYellow" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Yellow</label><label class="retirement-filter retirement-filter--orange"><input id="filterRetirementOrange" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Orange</label><label class="retirement-filter retirement-filter--red"><input id="filterRetirementRed" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Red</label></div>
       <button type="button" class="filter-clear" onclick="clearPlayerFilters()">Clear all filters</button>
       <span id="filterCount" role="status" aria-live="polite" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
-      <button id="btnUpgrade" onclick="toggleUpgradeFilter()" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:all 0.15s;" title="Show players whose OVR at an alternate position equals or exceeds their primary OVR">Alt Upgrade</button>
+      <button type="button" class="alt-upgrade-button" id="btnUpgrade" aria-pressed="false" onclick="toggleUpgradeFilter()" title="Show players with an alternate-position OVR at or above the selected percentage of their main OVR">Alt Upgrade</button>
+      <span class="alt-upgrade-controls" id="altUpgradeControls" hidden><label class="filter-label" for="filterUpgradeThreshold">Custom threshold</label><span class="alt-upgrade-threshold"><input class="filter-input" id="filterUpgradeThreshold" type="number" min="1" max="200" step="1" value="95" aria-label="Alternate upgrade threshold percentage" oninput="applyFilters()"><span aria-hidden="true">%</span></span></span>
     </div>
     <div class="player-table-header" aria-label="Player sort controls">
-      <button class="sort-header sort-header--ovr" type="button" data-sort="ovr" onclick="setPlayerSort('ovr')">OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--name" type="button" data-sort="name" onclick="setPlayerSort('name')">Name<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--position" type="button" data-sort="position" onclick="setPlayerSort('position')">Pos / OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--progression" type="button" data-sort="progression" onclick="setPlayerSort('progression')">All Δ<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--seasons" type="button" data-sort="seasons" onclick="setPlayerSort('seasons')">Seasons<span class="sort-indicator" aria-hidden="true"></span></button><div class="player-table-stat-headers"><button class="sort-header sort-header--stat" type="button" data-sort="pace" onclick="setPlayerSort('pace')">PAC<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="dribbling" onclick="setPlayerSort('dribbling')">DRI<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="passing" onclick="setPlayerSort('passing')">PAS<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="shooting" onclick="setPlayerSort('shooting')">SHO<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="defense" onclick="setPlayerSort('defense')">DEF<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="physical" onclick="setPlayerSort('physical')">PHY<span class="sort-indicator" aria-hidden="true"></span></button></div><button class="sort-header sort-header--age" type="button" data-sort="age" onclick="setPlayerSort('age')">Age<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--nationality" type="button" data-sort="nationality" onclick="setPlayerSort('nationality')">Nat<span class="sort-indicator" aria-hidden="true"></span></button>
+      <button class="sort-header sort-header--ovr" type="button" data-sort="ovr" onclick="setPlayerSort('ovr')">OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--name" type="button" data-sort="name" onclick="setPlayerSort('name')">Name<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--position" type="button" data-sort="position" onclick="setPlayerSort('position')">Main Pos / OVR<span class="sort-indicator" aria-hidden="true"></span></button><span class="player-table-header__other-position">Other Pos / OVR</span><button class="sort-header sort-header--progression" type="button" data-sort="progression" onclick="setPlayerSort('progression')">All Δ<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--seasons" type="button" data-sort="seasons" onclick="setPlayerSort('seasons')">Seasons<span class="sort-indicator" aria-hidden="true"></span></button><div class="player-table-stat-headers"><button class="sort-header sort-header--stat" type="button" data-sort="pace" onclick="setPlayerSort('pace')">PAC<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="dribbling" onclick="setPlayerSort('dribbling')">DRI<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="passing" onclick="setPlayerSort('passing')">PAS<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="shooting" onclick="setPlayerSort('shooting')">SHO<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="defense" onclick="setPlayerSort('defense')">DEF<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="physical" onclick="setPlayerSort('physical')">PHY<span class="sort-indicator" aria-hidden="true"></span></button></div><button class="sort-header sort-header--age" type="button" data-sort="age" onclick="setPlayerSort('age')">Age<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--nationality" type="button" data-sort="nationality" onclick="setPlayerSort('nationality')">Nat<span class="sort-indicator" aria-hidden="true"></span></button>
     </div>
     <div class="modal-body" id="playerListBody"></div>
   </div>
@@ -2183,6 +2214,8 @@ const PLAYER_PAGE_LIMIT=1500;
 const MAX_PLAYER_PAGES=50;
 const SUBSTITUTE_LIMIT=7;
 const SQUAD_PLAYER_LIMIT=25;
+const ALT_UPGRADE_DEFAULT_THRESHOLD=95;
+const POSITION_FILTER_THRESHOLD=95;
 const ENERGY_DEFAULT_DRAIN=4;
 const ENERGY_FLOOR=15;
 const ENERGY_SCHEDULE=[
@@ -3260,9 +3293,12 @@ function closeAddPlayerModal(){document.getElementById('addPlayerModal').classLi
 
 function updateUpgradeFilterButton(){
   const btn=document.getElementById('btnUpgrade');
+  const controls=document.getElementById('altUpgradeControls');
   btn.style.background=upgradeFilterOn?'var(--accent)':'var(--bg-tertiary)';
   btn.style.color=upgradeFilterOn?'#fff':'var(--text-secondary)';
   btn.style.borderColor=upgradeFilterOn?'var(--accent)':'var(--border-light)';
+  btn.setAttribute('aria-pressed',String(upgradeFilterOn));
+  controls.hidden=!upgradeFilterOn;
 }
 
 function toggleUpgradeFilter(){
@@ -3273,6 +3309,7 @@ function toggleUpgradeFilter(){
 
 function clearPlayerFilters(){
   ['filterName','filterOvrMin','filterOvrMax','filterAgeMin','filterAgeMax','filterSeasonsMin','filterSeasonsMax','filterProgressionMin','filterProgressionMax'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('filterUpgradeThreshold').value=ALT_UPGRADE_DEFAULT_THRESHOLD;
   document.getElementById('filterPos').value='';
   ['filterRetirementNone','filterRetirementYellow','filterRetirementOrange','filterRetirementRed'].forEach(id=>{document.getElementById(id).checked=false;});
   upgradeFilterOn=false;
@@ -3289,6 +3326,15 @@ function getPosOvr(p, pos) {
 function readOptionalNumber(id){
   const value=document.getElementById(id).value;
   return value===''?null:Number(value);
+}
+
+function altUpgradeThresholdPercent(){
+  const threshold=readOptionalNumber('filterUpgradeThreshold');
+  return Number.isFinite(threshold)?Math.min(200,Math.max(1,threshold)):ALT_UPGRADE_DEFAULT_THRESHOLD;
+}
+
+function meetsPositionThreshold(player,position,thresholdPercent){
+  return getPosOvr(player,position)>=Math.round(Number(player.ovr||0)*thresholdPercent/100);
 }
 
 function projectedPlayerSeasons(player){
@@ -3329,7 +3375,7 @@ function updatePlayerSortHeaders(){
 function playerSortValue(player,key,positionFilter){
   const stats=player.stats||{};
   switch(key){
-    case'ovr':return Number(positionFilter?getPosOvr(player,positionFilter):player.ovr);
+    case'ovr':return Number(player.ovr);
     case'name':return player.name||'';
     case'position':return (player.metadata?.positions?.[0]||String(player.positions||'').split(',')[0]||'').trim();
     case'progression':return playerProgression(player);
@@ -3368,6 +3414,7 @@ function playerCanBeSelectedForTarget(player,squad,target){
 
 function applyFilters(){
   const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=readOptionalNumber('filterOvrMin')??0,oMax=readOptionalNumber('filterOvrMax')??99,aMin=readOptionalNumber('filterAgeMin')??0,aMax=readOptionalNumber('filterAgeMax')??99,seasonsMin=readOptionalNumber('filterSeasonsMin'),seasonsMax=readOptionalNumber('filterSeasonsMax'),progressionMin=readOptionalNumber('filterProgressionMin'),progressionMax=readOptionalNumber('filterProgressionMax');
+  const upgradeThreshold=altUpgradeThresholdPercent();
   const excludedRetirementNotices=new Set([['none','filterRetirementNone'],['yellow','filterRetirementYellow'],['orange','filterRetirementOrange'],['red','filterRetirementRed']].filter(([,id])=>document.getElementById(id).checked).map(([notice])=>notice));
   const sq=activeSquad();
   const avail=allPlayers.filter(p=>{
@@ -3375,18 +3422,17 @@ function applyFilters(){
     if(!sq||squadPlayerCount(sq)>=SQUAD_PLAYER_LIMIT)return false;
     if(!sq||!playerCanBeSelectedForTarget(p,sq,addPlayerTarget))return false;
     if(nf&&!p.name.toLowerCase().includes(nf))return false;
-    // Position filter: show any player whose OVR at the selected position is >= 95% of their primary OVR
-    if(pf){
-      const posOvr=getPosOvr(p,pf);
-      if(posOvr<Math.round(p.ovr*0.95))return false;
-    }
+    // Position eligibility can use an alternate-position OVR, but OVR range filters always use main OVR.
+    if(pf&&!meetsPositionThreshold(p,pf,POSITION_FILTER_THRESHOLD))return false;
     if(p.ovr<oMin||p.ovr>oMax)return false;
     if(p.age<aMin||p.age>aMax)return false;
     if(seasonsMin!==null||seasonsMax!==null){const seasons=projectedPlayerSeasons(p);if(seasons===null||(seasonsMin!==null&&seasons<seasonsMin)||(seasonsMax!==null&&seasons>seasonsMax))return false;}
     if(progressionMin!==null||progressionMax!==null){const progression=playerProgression(p);if(progression===null||(progressionMin!==null&&progression<progressionMin)||(progressionMax!==null&&progression>progressionMax))return false;}
     if(excludedRetirementNotices.has(retirementNoticeLevel(p)))return false;
-    if(upgradeFilterOn&&p.metadata){
-      const hasUpgrade=POSITION_ORDER.some(pos=>pos!==p.metadata.positions[0]&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95));
+    if(upgradeFilterOn){
+      const registeredPositions=p.metadata?.positions||String(p.positions||'').split(',').map(pos=>pos.trim()).filter(Boolean);
+      const upgradeCandidates=p.metadata?POSITION_ORDER:registeredPositions.slice(1);
+      const hasUpgrade=upgradeCandidates.some(pos=>pos!==registeredPositions[0]&&meetsPositionThreshold(p,pos,upgradeThreshold));
       if(!hasUpgrade)return false;
     }
     return true;
@@ -3396,27 +3442,28 @@ function applyFilters(){
   const body=document.getElementById('playerListBody');body.innerHTML='';
   avail.forEach(p=>{
     const div=document.createElement('div');div.className='player-row';
-    // Display OVR: position-specific when filtered, primary otherwise
-    const displayOvr=pf?getPosOvr(p,pf):p.ovr;
-    // Position OVR chips
+    // The leading OVR and its filters always refer to the player's main position.
+    const displayOvr=p.ovr;
     const positions=p.metadata?p.metadata.positions:p.positions.split(',').map(s=>s.trim());
-    const posChips=positions.map(pos=>{
+    const makePositionChip=pos=>{
       const posOvr=getPosOvr(p,pos);
       const isAlt=pos!==positions[0];
       const isUpgrade=isAlt&&posOvr>=p.ovr;
       const isFiltered=pf&&pos===pf;
       const chipBg=isFiltered?'rgba(22,159,237,0.2)':isUpgrade?'rgba(58,242,75,0.15)':'var(--bg-tertiary)';
-      return `<span class="pos-chip" style="background:${chipBg}"><span class="pos-chip__label">${pos}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
-    }).join('');
+      return `<span class="pos-chip" style="background:${chipBg}"><span class="pos-chip__label">${escHtml(pos)}</span><span class="pos-chip__ovr" style="color:${getOvrColor(posOvr)}">${posOvr}</span></span>`;
+    };
+    const mainPositionChip=positions[0]?makePositionChip(positions[0]):'';
+    const otherPositionChips=positions.slice(1).map(makePositionChip).join('');
     // OOP chips: position filter chip + any Alt Upgrade qualifying OOP positions
     const makeOopChip=(pos,ovr)=>`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pos}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(ovr)}">${ovr}</span></span>`;
     const oopPositions=new Set();
     if(pf&&!positions.includes(pf))oopPositions.add(pf);
-    if(upgradeFilterOn&&p.metadata)POSITION_ORDER.forEach(pos=>{if(!positions.includes(pos)&&ovrAtPosition(p.metadata,pos)>=Math.round(p.ovr*0.95))oopPositions.add(pos);});
+    if(upgradeFilterOn&&p.metadata)POSITION_ORDER.forEach(pos=>{if(!positions.includes(pos)&&meetsPositionThreshold(p,pos,upgradeThreshold))oopPositions.add(pos);});
     const extraChip=[...oopPositions].map(pos=>makeOopChip(pos,Math.round(getPosOvr(p,pos)))).join('');
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos">${posChips}${extraChip}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos pr-pos--main">${mainPositionChip}</div><div class="pr-pos pr-pos--other">${otherPositionChips}${extraChip}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
