@@ -1823,6 +1823,61 @@ button.substitute-card:not(.is-filled):focus-visible {
   line-height: 1.55;
 }
 
+.energy-planner-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.energy-schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px 8px 8px 3px;
+  background: rgba(10, 14, 19, .76);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.energy-schedule-toggle:hover { border-color: rgba(168, 85, 247, .58); }
+.energy-schedule-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.energy-schedule-toggle[aria-checked="true"] {
+  border-color: rgba(72, 245, 154, .48);
+  background: rgba(72, 245, 154, .08);
+  box-shadow: inset 0 0 18px rgba(72, 245, 154, .04);
+}
+.energy-toggle-rail {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: #111820;
+}
+.energy-toggle-rail i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.energy-schedule-toggle[aria-checked="true"] .energy-toggle-rail i {
+  transform: translateX(14px);
+  background: var(--green);
+  box-shadow: 0 0 9px rgba(72, 245, 154, .42);
+}
+.energy-toggle-copy { display: grid; gap: 1px; }
+.energy-toggle-copy strong { font: 700 9px 'JetBrains Mono', monospace; }
+.energy-toggle-copy small { color: var(--text-muted); font: 500 7px 'JetBrains Mono', monospace; }
+
 .energy-planner-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1830,7 +1885,7 @@ button.substitute-card:not(.is-filled):focus-visible {
   gap: 6px;
 }
 
-.energy-planner-badges span {
+.energy-planner-badges > span {
   padding: 5px 8px;
   border: 1px solid var(--border-light);
   border-radius: 999px;
@@ -2045,6 +2100,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
 @media (max-width: 900px) {
   .energy-planner-header { flex-direction: column; gap: 12px; }
+  .energy-planner-actions { width: 100%; align-items: flex-start; }
   .energy-planner-badges { justify-content: flex-start; }
   .energy-summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
@@ -2162,8 +2218,14 @@ button.substitute-card:not(.is-filled):focus-visible {
               <h2 class="energy-planner-title" id="energyPlannerTitle">Starting XI energy planner</h2>
               <p class="energy-planner-copy">Match drain is modelled from real comparable players at the energy they start each game. Low training restores 20% of missing energy before games on Days 2–29.</p>
             </div>
-            <div class="energy-planner-badges" aria-label="Schedule summary">
-              <span>35 matches</span><span>28 training days</span><span>15% floor</span>
+            <div class="energy-planner-actions">
+              <button type="button" class="energy-schedule-toggle" id="energyScheduleToggle" role="switch" aria-checked="false" onclick="toggleEnergyScheduleMode()">
+                <span class="energy-toggle-rail" aria-hidden="true"><i></i></span>
+                <span class="energy-toggle-copy"><strong>28-game schedule</strong><small>First 6 cups · no league D31–33</small></span>
+              </button>
+              <div class="energy-planner-badges" aria-label="Schedule summary">
+                <span id="energyMatchCountBadge">35 matches</span><span>28 training days</span><span>15% floor</span>
+              </div>
             </div>
           </div>
           <div class="energy-planner-empty" id="energyPlannerEmpty">Choose a starters formation and add players to build the projection.</div>
@@ -2261,6 +2323,7 @@ const energyModelCache=new Map();
 const energyModelRequests=new Set();
 const energyModelFailures=new Map();
 let energyModelMessage='Loading real-match energy evidence…';
+let energyLimitedSchedule=localStorage.getItem('mfl_energy_limited_schedule')==='1';
 const ENERGY_SCHEDULE=[
   {day:1,training:false,league:true,cup:false},
   {day:2,training:true,league:true,cup:false},
@@ -2296,6 +2359,22 @@ const ENERGY_SCHEDULE=[
   {day:32,training:false,league:true,cup:false},
   {day:33,training:false,league:true,cup:false}
 ];
+
+function activeEnergySchedule(){
+  if(!energyLimitedSchedule)return ENERGY_SCHEDULE;
+  let cupsIncluded=0;
+  return ENERGY_SCHEDULE.filter(day=>day.day<=30).map(day=>{
+    const cup=Boolean(day.cup&&cupsIncluded<6);
+    if(cup)cupsIncluded+=1;
+    return{...day,cup};
+  });
+}
+
+function toggleEnergyScheduleMode(){
+  energyLimitedSchedule=!energyLimitedSchedule;
+  localStorage.setItem('mfl_energy_limited_schedule',energyLimitedSchedule?'1':'0');
+  renderEnergyPlanner(false);
+}
 const DIVISION_MIN_OVR={1:88,2:85,3:82,4:78,5:74,6:70,7:65,8:56,9:46,10:null};
 const DIVISION_NAMES={1:'Diamond',2:'Plat',3:'Gold',4:'Silver',5:'Bronze',6:'Iron',7:'Stone',8:'Ice',9:'Spark',10:'Flint'};
 const viewerParams=new URLSearchParams(window.location.search);
@@ -2678,14 +2757,14 @@ function energyUseFor(starter,energyRaw){
   return prediction?{...prediction,source:'model'}:{drainRaw:Math.round(starter.drain*100),sampleSize:0,source:starter.manualDrain?'manual':'fallback'};
 }
 
-function calculateEnergyProjection(starters){
+function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
   let energies=starters.map(()=>ENERGY_MAX_RAW);
   const rows=[];
   let lowest=ENERGY_MAX_RAW;
   let warningStarts=0;
   let firstWarning=null;
 
-  ENERGY_SCHEDULE.forEach(scheduleDay=>{
+  schedule.forEach(scheduleDay=>{
     const start=energies.slice();
     if(scheduleDay.training)energies=energies.map(energy=>Math.round(energy+(ENERGY_MAX_RAW-energy)*0.2));
     const afterTraining=energies.slice();
@@ -2738,6 +2817,11 @@ function clearEnergyDrainOverride(starterIndex){
 function renderEnergyPlanner(refreshControls=true){
   const empty=document.getElementById('energyPlannerEmpty'),content=document.getElementById('energyPlannerContent'),summary=document.getElementById('energySummary'),controls=document.getElementById('energyStarterControls'),table=document.getElementById('energyTable'),modelStatus=document.getElementById('energyModelStatus');
   if(!empty||!content||!summary||!controls||!table)return;
+  const schedule=activeEnergySchedule();
+  const scheduleToggle=document.getElementById('energyScheduleToggle'),matchCountBadge=document.getElementById('energyMatchCountBadge');
+  const scheduleMatchCount=schedule.reduce((total,day)=>total+Number(day.league)+Number(day.cup),0);
+  if(scheduleToggle)scheduleToggle.setAttribute('aria-checked',String(energyLimitedSchedule));
+  if(matchCountBadge)matchCountBadge.textContent=`${scheduleMatchCount} matches`;
   const squad=activeSquad();
   const starters=getEnergyStarters(squad);
   if(!squad||!starters.length){
@@ -2756,7 +2840,7 @@ function renderEnergyPlanner(refreshControls=true){
     table.innerHTML='<tbody><tr><td style="padding:24px;text-align:center;color:var(--text-muted)">Loading raw historic energy observations…</td></tr></tbody>';
     return;
   }
-  const projection=calculateEnergyProjection(starters);
+  const projection=calculateEnergyProjection(starters,schedule);
   const finalMin=projection.final.length?Math.min(...projection.final):ENERGY_MAX_RAW;
   const finalMax=projection.final.length?Math.max(...projection.final):ENERGY_MAX_RAW;
   const finalMinPercent=Math.ceil(finalMin/100),finalMaxPercent=Math.ceil(finalMax/100);
@@ -2766,7 +2850,7 @@ function renderEnergyPlanner(refreshControls=true){
   summary.innerHTML=`
     <div class="energy-summary-card${starters.length<11?' is-warning':''}"><span class="energy-summary-label">Starting XI</span><span class="energy-summary-value">${starters.length} / 11</span><span class="energy-summary-detail">${modelledCount} using real-match curves${starters.length===11?'':' · add missing starters'}</span></div>
     <div class="energy-summary-card"><span class="energy-summary-label">Lowest energy</span><span class="energy-summary-value">${formatEnergy(projection.lowest)}</span><span class="energy-summary-detail">End-of-day minimum</span></div>
-    <div class="energy-summary-card"><span class="energy-summary-label">Final XI range</span><span class="energy-summary-value">${finalLabel}</span><span class="energy-summary-detail">After Day 33</span></div>
+    <div class="energy-summary-card"><span class="energy-summary-label">Final XI range</span><span class="energy-summary-value">${finalLabel}</span><span class="energy-summary-detail">After Day ${schedule[schedule.length-1]?.day||0}</span></div>
     <div class="energy-summary-card${projection.warningStarts?' is-warning':''}"><span class="energy-summary-label">Blocked match starts</span><span class="energy-summary-value">${projection.warningStarts}</span><span class="energy-summary-detail">${firstWarningDetail}</span></div>`;
 
   if(refreshControls){
