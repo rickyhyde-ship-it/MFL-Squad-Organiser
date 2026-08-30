@@ -3597,7 +3597,7 @@ function retirementNoticeLevel(player){
 }
 
 function setPlayerSort(key){
-  const textColumns=new Set(['name','position','nationality']);
+  const textColumns=new Set(['name','nationality']);
   if(playerSortKey===key)playerSortDirection=playerSortDirection==='asc'?'desc':'asc';
   else{playerSortKey=key;playerSortDirection=textColumns.has(key)?'asc':'desc';}
   applyFilters();
@@ -3618,7 +3618,10 @@ function playerSortValue(player,key,positionFilter){
   switch(key){
     case'ovr':return Number(player.ovr);
     case'name':return player.name||'';
-    case'position':return (player.metadata?.positions?.[0]||String(player.positions||'').split(',')[0]||'').trim();
+    case'position':{
+      const mainPosition=(player.metadata?.positions?.[0]||String(player.positions||'').split(',')[0]||'').trim();
+      return mainPosition?Number(getPosOvr(player,mainPosition)):null;
+    }
     case'progression':return playerProgression(player);
     case'seasons':return projectedPlayerSeasons(player);
     case'pace':return Number(stats.pace);
