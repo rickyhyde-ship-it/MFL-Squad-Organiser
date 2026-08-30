@@ -2029,9 +2029,13 @@ button.substitute-card:not(.is-filled):focus-visible {
 .energy-event.training { border-color: rgba(58, 242, 75, .24); color: #8ef299; }
 .energy-event.match { border-color: rgba(168, 85, 247, .34); color: #caa7ff; }
 .energy-cell strong { display: block; color: #b8f7c0; font: 700 11px 'JetBrains Mono', monospace; }
+.energy-cell strong.energy-match-values { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 7px; }
+.energy-match-value { display: inline-flex; align-items: baseline; white-space: nowrap; }
+.energy-match-value + .energy-match-value { padding-left: 7px; border-left: 1px solid rgba(147, 164, 184, .28); }
+.energy-match-value em { margin-right: 3px; color: var(--text-muted); font: 700 7px 'JetBrains Mono', monospace; font-style: normal; }
 .energy-cell small { display: block; margin-top: 2px; color: var(--text-muted); font: 500 7px 'JetBrains Mono', monospace; }
 .energy-cell.is-low { background: rgba(255, 87, 87, .08); }
-.energy-cell.is-low strong { color: #ff7777; }
+.energy-cell .energy-match-value.is-low { color: #ff7777; }
 .energy-table tbody tr.has-fallback > * { box-shadow: inset 0 1px rgba(255, 179, 71, .46), inset 0 -1px rgba(255, 179, 71, .46); }
 .energy-cell.is-fallback { background: rgba(255, 179, 71, .14) !important; }
 .energy-cell.is-fallback strong { color: #ffc875; }
@@ -2170,7 +2174,7 @@ button.substitute-card:not(.is-filled):focus-visible {
               <div class="energy-starter-controls" id="energyStarterControls"></div>
             </div>
             <div class="energy-table-heading">
-              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Calculated in raw MFL units; displayed as a percentage rounded up to the next whole number.</span></div>
+              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Shows the energy at the start of each match, calculated in raw MFL units and rounded up for display.</span></div>
               <div class="energy-legend"><span><i class="energy-dot safe"></i>&gt; 60%</span><span><i class="energy-dot danger"></i>60% or less</span><span><i class="energy-dot fallback"></i>Fallback used</span></div>
             </div>
             <div class="energy-table-shell" tabindex="0" aria-label="Scrollable daily starter energy table">
@@ -2786,10 +2790,14 @@ function renderEnergyPlanner(refreshControls=true){
     const cells=row.end.map((energy,index)=>{
       const usesFallback=row.matchStarts.some(match=>match.uses[index].source==='fallback');
       const games=row.matchStarts.map(match=>`G${match.match} ${match.energies[index]} raw (${formatEnergy(match.energies[index])}) −${match.uses[index].drainRaw} raw${match.uses[index].source==='model'?` (${match.uses[index].sampleSize} samples)`:` (${match.uses[index].source})`}`);
-      const displayedStart=row.matchStarts[0]?.energies[index]??row.afterTraining[index];
-      const startLabel=row.matchStarts.length?`${formatEnergy(displayedStart)} game start`:`${formatEnergy(displayedStart)} after training`;
+      const matchEnergyValues=row.matchStarts.map(match=>match.energies[index]);
+      const displayedValues=row.matchStarts.length
+        ?row.matchStarts.map(match=>`<span class="energy-match-value${match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}">${row.matchStarts.length>1?`<em>G${match.match}</em>`:''}${formatEnergy(match.energies[index])}</span>`).join('')
+        :`<span class="energy-match-value${row.afterTraining[index]<=ENERGY_LOW_RAW?' is-low':''}">${formatEnergy(row.afterTraining[index])}</span>`;
+      const startLabel=row.matchStarts.length?`${row.matchStarts.length>1?'match starts':'game start'} · ends ${formatEnergy(energy)}`:'after training';
       const detail=games.length?games.join(' · '):'No match';
-      return`<td class="energy-cell${energy<=ENERGY_LOW_RAW?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><strong>${formatEnergy(energy)}</strong><small>${startLabel}${usesFallback?' · FALLBACK':''}</small></td>`;
+      const hasLowStart=(matchEnergyValues.length?matchEnergyValues:[row.afterTraining[index]]).some(value=>value<=ENERGY_LOW_RAW);
+      return`<td class="energy-cell${hasLowStart?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><strong class="energy-match-values">${displayedValues}</strong><small>${startLabel}${usesFallback?' · FALLBACK':''}</small></td>`;
     }).join('');
     const hasWarning=row.matchStarts.some(match=>match.blocked);
     const hasFallback=row.matchStarts.some(match=>match.uses.some(use=>use.source==='fallback'));
