@@ -99,6 +99,7 @@ body {
 .career-scan__optional { padding:2px 6px; border:1px solid var(--border-light); border-radius:999px; color:var(--text-muted); font:700 8px 'JetBrains Mono',monospace; text-transform:uppercase; }
 .career-scan__warning { margin-top:4px; color:var(--text-secondary); font-size:11px; line-height:1.45; }
 .career-scan__actions { display:flex; gap:8px; }
+.career-scan__actions [hidden] { display:none; }
 .career-scan__progress { grid-column:1/-1; display:grid; grid-template-columns:minmax(160px,1fr) auto auto; gap:10px; align-items:center; }
 .career-scan__track { height:7px; overflow:hidden; border:1px solid var(--border); border-radius:999px; background:rgba(1,8,13,.72); }
 .career-scan__fill { width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#27c97d,#48f59a); box-shadow:0 0 14px rgba(72,245,154,.32); transition:width .25s ease; }
@@ -2346,6 +2347,7 @@ const ENERGY_MAX_RAW=10000;
 const ENERGY_FLOOR_RAW=1500;
 const ENERGY_LOW_RAW=6000;
 const ENERGY_MATCH_TOLERANCE_RAW=300;
+const ENERGY_POOL_BATCH_SIZE=11;
 const ENERGY_MODEL_API='https://mfl-energy-crawler.ricky-hyde-selling.workers.dev/api/energy-models';
 const energyModelCache=new Map();
 const energyModelRequests=new Set();
@@ -2707,11 +2709,11 @@ async function startEnergyPoolScan(){
   const scanButton=document.getElementById('energyPoolScanButton'),stopButton=document.getElementById('energyPoolScanStopButton');
   scanButton.disabled=true;stopButton.hidden=false;stopButton.disabled=false;
   const activeKeys=new Set(getEnergyStarters(activeSquad()).map(starter=>starter.modelKey).filter(Boolean));
-  let completed=0,failures=0;
+  let completed=0,failures=0,loggedBatchFailure=false;
   const startedAt=Date.now();
   try{
-    for(let offset=0;offset<pending.length&&!energyPoolScanStop;offset+=12){
-      const batch=pending.slice(offset,offset+12);
+    for(let offset=0;offset<pending.length&&!energyPoolScanStop;offset+=ENERGY_POOL_BATCH_SIZE){
+      const batch=pending.slice(offset,offset+ENERGY_POOL_BATCH_SIZE);
       try{
         const response=await fetch(ENERGY_MODEL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profiles:batch})});
         if(!response.ok)throw new Error(`Energy model returned ${response.status}`);
@@ -2725,7 +2727,7 @@ async function startEnergyPoolScan(){
         });
       }catch(error){
         failures+=batch.length;
-        console.warn('Energy drain batch failed',error);
+        if(!loggedBatchFailure){console.warn('Energy drain scan encountered a batch failure; additional failures are shown in the scan status.',error);loggedBatchFailure=true;}
       }
       completed+=batch.length;
       saveEnergyProjectionCounts();
@@ -2736,8 +2738,9 @@ async function startEnergyPoolScan(){
     if(document.getElementById('addPlayerModal').classList.contains('open'))applyFilters();
     const status=document.getElementById('energyPoolScanStatus');
     if(energyPoolScanStop)status.textContent='Energy scan paused. Progress has been saved.';
-    else status.textContent=`Energy scan complete · ${energyPoolReadyCount(profiles)}/${profiles.length} player positions ready${failures?` · ${failures} failed`:''}`;
-    document.getElementById('energyPoolScanEta').textContent=energyPoolScanStop?'ETA paused':'Up to date';
+    else if(failures)status.textContent=`Energy scan finished · ${energyPoolReadyCount(profiles)}/${profiles.length} player positions ready · ${failures} failed`;
+    else status.textContent=`Energy scan complete · ${energyPoolReadyCount(profiles)}/${profiles.length} player positions ready`;
+    document.getElementById('energyPoolScanEta').textContent=energyPoolScanStop?'ETA paused':failures?'Retry available':'Up to date';
   }catch(error){
     document.getElementById('energyPoolScanStatus').textContent=error.message||'Energy scan failed.';
     document.getElementById('energyPoolScanEta').textContent='ETA —';
