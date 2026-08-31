@@ -2704,7 +2704,7 @@ function loadEnergyModels(starters){
   const now=Date.now();
   starters.forEach(entry=>{if(entry.profile&&entry.modelKey&&!energyModelCache.has(entry.modelKey)&&now-Number(energyModelFailures.get(entry.modelKey)||0)>60000)profiles.set(entry.modelKey,{key:entry.modelKey,...entry.profile});});
   if(!profiles.size){
-    if(starters.some(entry=>entry.modelKey)&&starters.every(entry=>!entry.modelKey||energyModelCache.has(entry.modelKey)))energyModelMessage='Real-match model ready · ±3 energy · ±5 OVR/PHY · exact retirement';
+    if(starters.some(entry=>entry.modelKey)&&starters.every(entry=>!entry.modelKey||energyModelCache.has(entry.modelKey)))energyModelMessage='Real-match model ready · ±3 energy · OVR/PHY −5/+5 · retry −10/+5 · exact retirement';
     return;
   }
   const requestKey=[...profiles.keys()].sort().join('~');
@@ -2720,7 +2720,7 @@ function loadEnergyModels(starters){
     return response.json();
   }).then(payload=>{
     (payload.models||[]).forEach(model=>{energyModelCache.set(model.key,model);energyModelFailures.delete(model.key);});
-    energyModelMessage='Real-match model ready · ±3 energy · ±5 OVR/PHY · exact retirement';
+    energyModelMessage='Real-match model ready · ±3 energy · OVR/PHY −5/+5 · retry −10/+5 · exact retirement';
   }).catch(error=>{
     profiles.forEach((_,key)=>energyModelFailures.set(key,Date.now()));
     energyModelMessage='Real-match model unavailable · using retirement-based fallback drains';
@@ -2740,9 +2740,17 @@ function modelPredictionFor(starter,energyRaw){
   if(starter.manualDrain||!starter.modelKey)return null;
   const model=energyModelCache.get(starter.modelKey);
   if(!model||!Array.isArray(model.observations))return null;
+  const standard=predictionFromEnergyObservations(model.observations,energyRaw);
+  if(standard)return{...standard,tier:'standard'};
+  const widened=predictionFromEnergyObservations(model.widenedObservations,energyRaw);
+  return widened?{...widened,tier:'widened'}:null;
+}
+
+function predictionFromEnergyObservations(observations,energyRaw){
+  if(!Array.isArray(observations))return null;
   const targetRaw=Math.round(Number(energyRaw));
   let weightedDrainRaw=0,sampleSize=0;
-  for(const observation of model.observations){
+  for(const observation of observations){
     const observedRaw=Number(observation.energyRaw),samples=Number(observation.sampleSize),drainRaw=Number(observation.averageDrainRaw);
     if(!Number.isInteger(observedRaw)||!Number.isFinite(samples)||samples<=0||!Number.isFinite(drainRaw))continue;
     if(Math.abs(observedRaw-targetRaw)>ENERGY_MATCH_TOLERANCE_RAW)continue;
@@ -2754,7 +2762,7 @@ function modelPredictionFor(starter,energyRaw){
 
 function energyUseFor(starter,energyRaw){
   const prediction=modelPredictionFor(starter,energyRaw);
-  return prediction?{...prediction,source:'model'}:{drainRaw:Math.round(starter.drain*100),sampleSize:0,source:starter.manualDrain?'manual':'fallback'};
+  return prediction?{...prediction,source:prediction.tier==='widened'?'widened':'model'}:{drainRaw:Math.round(starter.drain*100),sampleSize:0,source:starter.manualDrain?'manual':'fallback'};
 }
 
 function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
@@ -2858,7 +2866,7 @@ function renderEnergyPlanner(refreshControls=true){
       const position=entry.slot.slotPos||'XI';
       const prediction=modelPredictionFor(entry,ENERGY_MAX_RAW),displayDrain=entry.manualDrain?entry.drain:prediction?prediction.drainRaw/100:entry.drain;
       const fallback=!entry.manualDrain&&!prediction;
-      const source=entry.manualDrain?'Manual fixed drain':prediction?`Historic model · ${prediction.sampleSize.toLocaleString()} matches within ±300 raw`:entry.modelKey&&energyModelCache.has(entry.modelKey)?'FALLBACK · no historic match within ±300 raw':'FALLBACK · player profile unavailable';
+      const source=entry.manualDrain?'Manual fixed drain':prediction?`${prediction.tier==='widened'?'Widened model −10/+5':'Historic model −5/+5'} · ${prediction.sampleSize.toLocaleString()} matches within ±300 raw`:entry.modelKey&&energyModelCache.has(entry.modelKey)?'FALLBACK · no historic match after −10/+5 retry':'FALLBACK · player profile unavailable';
       return`<div class="energy-player-control${fallback?' is-fallback':''}"><span class="energy-player-identity"><span class="energy-player-pos">${escHtml(position)}</span><span class="energy-player-name" title="${escAttr(entry.player.name)}">${escHtml(entry.player.name)}</span><span class="energy-player-model">${escHtml(source)}</span></span><span class="energy-drain-field"><input class="energy-drain-input" type="number" min="0" max="20" step="0.1" inputmode="decimal" value="${displayDrain.toFixed(1)}" title="Edit to use a fixed manual drain" aria-label="Energy drain per match for ${escAttr(entry.player.name)}" onchange="updateEnergyDrain(${entry.index},this.value)"${viewerMode?' disabled':''}>${entry.manualDrain&&!viewerMode?`<button type="button" class="energy-use-model" onclick="clearEnergyDrainOverride(${entry.index})" title="Return to the real-match model">AUTO</button>`:''}</span></div>`;
     }).join('');
   }
@@ -2873,7 +2881,8 @@ function renderEnergyPlanner(refreshControls=true){
     if(!events.length)events.push('<span class="energy-event">No events</span>');
     const cells=row.end.map((energy,index)=>{
       const usesFallback=row.matchStarts.some(match=>match.uses[index].source==='fallback');
-      const games=row.matchStarts.map(match=>`G${match.match} ${match.energies[index]} raw (${formatEnergy(match.energies[index])}) −${match.uses[index].drainRaw} raw${match.uses[index].source==='model'?` (${match.uses[index].sampleSize} samples)`:` (${match.uses[index].source})`}`);
+      const usesWidened=row.matchStarts.some(match=>match.uses[index].source==='widened');
+      const games=row.matchStarts.map(match=>`G${match.match} ${match.energies[index]} raw (${formatEnergy(match.energies[index])}) −${match.uses[index].drainRaw} raw${match.uses[index].source==='model'||match.uses[index].source==='widened'?` (${match.uses[index].sampleSize} samples${match.uses[index].source==='widened'?', widened':''})`:` (${match.uses[index].source})`}`);
       const matchEnergyValues=row.matchStarts.map(match=>match.energies[index]);
       const displayedValues=row.matchStarts.length
         ?row.matchStarts.map(match=>`<span class="energy-match-value${match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}">${row.matchStarts.length>1?`<em>G${match.match}</em>`:''}${formatEnergy(match.energies[index])}</span>`).join('')
@@ -2881,11 +2890,11 @@ function renderEnergyPlanner(refreshControls=true){
       const startLabel=row.matchStarts.length?`${row.matchStarts.length>1?'match starts':'game start'} · ends ${formatEnergy(energy)}`:'after training';
       const detail=games.length?games.join(' · '):'No match';
       const hasLowStart=(matchEnergyValues.length?matchEnergyValues:[row.afterTraining[index]]).some(value=>value<=ENERGY_LOW_RAW);
-      return`<td class="energy-cell${hasLowStart?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><strong class="energy-match-values">${displayedValues}</strong><small>${startLabel}${usesFallback?' · FALLBACK':''}</small></td>`;
+      return`<td class="energy-cell${hasLowStart?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><strong class="energy-match-values">${displayedValues}</strong><small>${startLabel}${usesFallback?' · FALLBACK':usesWidened?' · WIDENED':''}</small></td>`;
     }).join('');
     const hasWarning=row.matchStarts.some(match=>match.blocked);
     const hasFallback=row.matchStarts.some(match=>match.uses.some(use=>use.source==='fallback'));
-    const matchStatus=row.matchStarts.length?row.matchStarts.map(match=>{const fallbackCount=match.uses.filter(use=>use.source==='fallback').length;return`<span>G${match.match}: ${match.tiredCount}/${starters.length} ≤60%${match.blocked?' ⚠':''}${fallbackCount?` · ${fallbackCount} fallback`:''}</span>`;}).join(''):'<span>No match</span>';
+    const matchStatus=row.matchStarts.length?row.matchStarts.map(match=>{const widenedCount=match.uses.filter(use=>use.source==='widened').length,fallbackCount=match.uses.filter(use=>use.source==='fallback').length;return`<span>G${match.match}: ${match.tiredCount}/${starters.length} ≤60%${match.blocked?' ⚠':''}${widenedCount?` · ${widenedCount} widened`:''}${fallbackCount?` · ${fallbackCount} fallback`:''}</span>`;}).join(''):'<span>No match</span>';
     return`<tr class="${hasFallback?'has-fallback':''}"><th scope="row" class="energy-day">D${day.day}</th><td><div class="energy-events">${events.join('')}</div></td>${cells}<td class="energy-match-status${hasWarning?' is-warning':''}">${matchStatus}</td></tr>`;
   }).join('');
   table.innerHTML=`<thead><tr><th scope="col">Day</th><th scope="col">Schedule</th>${playerHeaders}<th scope="col">Match starts</th></tr></thead><tbody>${body}</tbody>`;
