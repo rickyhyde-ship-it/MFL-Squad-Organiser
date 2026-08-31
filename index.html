@@ -157,7 +157,10 @@ body {
 .pitch-slot-footer { width: 100%; background: rgba(8, 12, 18, 0.88); padding: 2px 4px 3px; text-align: center; }
 .pitch-slot-pos { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
 .pitch-slot-name { font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68px; }
-.pitch-slot-ovr { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+.pitch-slot-ovr { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; text-align: center; }
+.pitch-slot-ovr-value { grid-column: 2; }
+.pitch-slot-ovr-alerts { grid-column: 3; display: inline-flex; align-items: baseline; justify-self: start; gap: 3px; min-width: 0; margin-left: 3px; color: var(--red); font-size: 8px; font-weight: 700; }
+.pitch-slot-energy-warning { color: var(--red); }
 .pitch-slot-retire { font-size: 9px; margin-top: 1px; }
 .pitch-slot-remove { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); color: #fff; font-size: 10px; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
 .pitch-slot-card:hover .pitch-slot-remove { display: flex; }
@@ -2800,6 +2803,32 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
   return{rows,lowest,warningStarts,firstWarning,final:energies.slice()};
 }
 
+function updatePitchEnergyWarnings(starters,projection){
+  const pitch=document.getElementById('startersPitch');
+  if(!pitch)return;
+  pitch.querySelectorAll('.pitch-slot-energy-warning').forEach(warning=>warning.remove());
+  if(!projection)return;
+  const lowStarts=new Map(starters.map(entry=>[entry.index,0]));
+  projection.rows.forEach(row=>row.matchStarts.forEach(match=>match.energies.forEach((energy,starterIndex)=>{
+    if(energy>ENERGY_LOW_RAW)return;
+    const starter=starters[starterIndex];
+    if(starter)lowStarts.set(starter.index,(lowStarts.get(starter.index)||0)+1);
+  })));
+  starters.forEach(entry=>{
+    const count=lowStarts.get(entry.index)||0;
+    if(!count)return;
+    const alerts=pitch.querySelector(`.pitch-slot[data-idx="${entry.index}"] .pitch-slot-ovr-alerts`);
+    if(!alerts)return;
+    const warning=document.createElement('span');
+    const label=`${entry.player.name} starts ${count} match${count===1?'':'es'} at 60% energy or less`;
+    warning.className='pitch-slot-energy-warning';
+    warning.textContent=String(count);
+    warning.title=label;
+    warning.setAttribute('aria-label',label);
+    alerts.appendChild(warning);
+  });
+}
+
 function formatEnergy(valueRaw){return`${Math.ceil(Number(valueRaw)/100)}%`;}
 
 function updateEnergyDrain(starterIndex,value){
@@ -2833,6 +2862,7 @@ function renderEnergyPlanner(refreshControls=true){
   const squad=activeSquad();
   const starters=getEnergyStarters(squad);
   if(!squad||!starters.length){
+    updatePitchEnergyWarnings([],null);
     empty.hidden=false;
     content.hidden=true;
     return;
@@ -2843,12 +2873,14 @@ function renderEnergyPlanner(refreshControls=true){
   loadEnergyModels(starters);
   if(modelStatus)modelStatus.textContent=energyModelMessage;
   if(energyModelsPending(starters)){
+    updatePitchEnergyWarnings(starters,null);
     summary.innerHTML=`<div class="energy-summary-card"><span class="energy-summary-label">Historic evidence</span><span class="energy-summary-value">Loading…</span><span class="energy-summary-detail">The projection will start only after matching data is checked.</span></div>`;
     if(refreshControls)controls.innerHTML=starters.map(entry=>`<div class="energy-player-control"><span class="energy-player-identity"><span class="energy-player-pos">${escHtml(entry.slot.slotPos||'XI')}</span><span class="energy-player-name">${escHtml(entry.player.name)}</span><span class="energy-player-model">Checking exact historic matches…</span></span></div>`).join('');
     table.innerHTML='<tbody><tr><td style="padding:24px;text-align:center;color:var(--text-muted)">Loading raw historic energy observations…</td></tr></tbody>';
     return;
   }
   const projection=calculateEnergyProjection(starters,schedule);
+  updatePitchEnergyWarnings(starters,projection);
   const finalMin=projection.final.length?Math.min(...projection.final):ENERGY_MAX_RAW;
   const finalMax=projection.final.length?Math.max(...projection.final):ENERGY_MAX_RAW;
   const finalMinPercent=Math.ceil(finalMin/100),finalMaxPercent=Math.ceil(finalMax/100);
@@ -3477,12 +3509,12 @@ function renderPitch(section){
       const hasImg=!!player?.id;
       const imgH=hasImg?`<img class="pitch-slot-img" src="https://d13e14gtps4iwl.cloudfront.net/players/v2/${player.id}/card.png" loading="lazy" onerror="this.closest('.pitch-slot-card').classList.remove('has-img')">`:'';
       const penPct=(!isL&&player&&top16Avg!==null)?getTrainingPenaltyPct(player.ovr-top16Avg):null;
-      const penInline=viewerMode?'':penPct?`<span style="font-size:8px;color:var(--red);font-weight:700;margin-left:3px">-${penPct}%</span>`:'';
+      const penInline=viewerMode?'':penPct?`<span class="pitch-slot-training-warning">-${penPct}%</span>`:'';
       const ageLine=player?.age?`<span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--yellow);margin-left:3px">${player.age}${getRetireIcon(player.retireIn)}</span>`:'';
       const removeButton=viewerMode?'':`<button type="button" class="pitch-slot-remove" aria-label="Remove ${escAttr(player?.name||'player')} from ${section}" onclick="event.stopPropagation();removeFromSlot('${section}',${i})">&times;</button>`;
       const coverBadge=isMultiCover?`<div class="multi-cover-badge" title="Covers ${escAttr(coverPositions.join(', '))}">${coverPositions.length} POS</div>`:'';
       const backupActions=!viewerMode&&section==='backups'&&!isL?`<div class="backup-card-actions"><button type="button" class="backup-card-action" onclick="event.stopPropagation();startBackupCover('${escAttr(String(slot.playerId))}')"${(sq.backups||[]).some(item=>!item||isSlotIgnoredNextSeason(item))?'':' disabled'}>+ Cover</button><button type="button" class="backup-card-action sub-action" onclick="event.stopPropagation();addBackupPlayerToSubstitutes('${escAttr(String(slot.playerId))}')"${sectionHasPlayer(sq,'substitutes',slot.playerId)||(sq.substitutes||[]).filter(item=>item&&!isSlotIgnoredNextSeason(item)).length>=SUBSTITUTE_LIMIT?' disabled':''}>+ Sub</button></div>`:'';
-      div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''} ${isMultiCover?'multi-cover':''}">${removeButton}${coverBadge}${backupActions}${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr" style="color:${ovrC}">${dOvr}${penInline}</div>${retH}<div class="pitch-slot-pos">${pos}${ageLine}</div></div></div>`;
+      div.innerHTML=`<div class="pitch-slot-card ${hasImg?'has-img':''} ${isL?'loan':''} ${isOop?'oop':''} ${isMultiCover?'multi-cover':''}">${removeButton}${coverBadge}${backupActions}${isL?'<div class="loan-badge">LOAN</div>':''}${isOop?'<div class="oop-badge">OOP</div>':''}${imgH}<div class="pitch-slot-footer"><div class="pitch-slot-name">${escHtml(player?player.name.split(' ').pop():'?')}</div><div class="pitch-slot-ovr"><span class="pitch-slot-ovr-value" style="color:${ovrC}">${dOvr}</span><span class="pitch-slot-ovr-alerts">${penInline}</span></div>${retH}<div class="pitch-slot-pos">${pos}${ageLine}</div></div></div>`;
       if(!viewerMode){let _tc=0,_tt=null;div.addEventListener('click',()=>{_tc++;if(_tc===1)_tt=setTimeout(()=>{_tc=0;},600);if(_tc>=3){clearTimeout(_tt);_tc=0;removeFromSlot(section,i);}});}
     }else{
       const isCoverTarget=!viewerMode&&section==='backups'&&pendingCoverPlayerId!==null;
