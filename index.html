@@ -104,6 +104,9 @@ body {
 .career-scan__fill { width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#27c97d,#48f59a); box-shadow:0 0 14px rgba(72,245,154,.32); transition:width .25s ease; }
 .career-scan__status,.career-scan__eta { color:var(--text-muted); font:600 10px 'JetBrains Mono',monospace; white-space:nowrap; }
 .career-scan__eta { color:#a8f5cd; }
+.energy-pool-scan { border-color:rgba(168,85,247,.26); background:linear-gradient(100deg,rgba(168,85,247,.075),rgba(17,24,32,.86) 48%); }
+.energy-pool-scan .career-scan__fill { background:linear-gradient(90deg,#8b5cf6,#c084fc); box-shadow:0 0 14px rgba(168,85,247,.35); }
+.energy-pool-scan .career-scan__eta { color:#dec3ff; }
 
 .main-layout { display: flex; height: calc(100vh - 115px); }
 .squad-nav { width: 220px; min-width: 220px; background: var(--bg-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -269,6 +272,7 @@ body {
 .pr-pos--other { width:180px; flex:0 0 180px; }
 .pr-energy { width:46px; flex:0 0 46px; color:var(--red); font:700 11px 'JetBrains Mono',monospace; text-align:center; }
 .pr-energy.is-clear { color:var(--text-muted); }
+.pr-energy.is-pending { color:var(--text-muted); }
 .pos-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 5px; border-radius:4px; background:var(--bg-tertiary); font-family:'JetBrains Mono',monospace; font-size:10px; white-space:nowrap; }
 .pos-chip__label { color:var(--text-muted); }
 .pos-chip__ovr { font-weight:700; }
@@ -2190,6 +2194,21 @@ button.substitute-card:not(.is-filled):focus-visible {
           <span class="career-scan__eta" id="careerScanEta">ETA —</span>
         </div>
       </section>
+      <section class="career-scan energy-pool-scan" id="energyPoolScanPanel" aria-label="Energy drain scan" hidden>
+        <div>
+          <div class="career-scan__title">Energy drain <span class="career-scan__optional">Optional scan</span></div>
+          <div class="career-scan__warning">Processes every player’s registered positions with the historic energy model, then stores compact ≤60% projections so the player list matches the squad planner.</div>
+        </div>
+        <div class="career-scan__actions">
+          <button class="btn btn-accent" type="button" id="energyPoolScanButton" onclick="startEnergyPoolScan()">Update energy drain</button>
+          <button class="btn" type="button" id="energyPoolScanStopButton" onclick="pauseEnergyPoolScan()" hidden>Pause</button>
+        </div>
+        <div class="career-scan__progress">
+          <div class="career-scan__track" id="energyPoolScanProgress" role="progressbar" aria-label="Energy drain scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="career-scan__fill" id="energyPoolScanFill"></div></div>
+          <span class="career-scan__status" id="energyPoolScanStatus" role="status" aria-live="polite">Not processed</span>
+          <span class="career-scan__eta" id="energyPoolScanEta">ETA —</span>
+        </div>
+      </section>
       <div class="no-squad-msg" id="noSquadMsg">Select or create a squad to get started</div>
       <div id="squadContent" style="display:none">
         <div class="squad-header">
@@ -2313,6 +2332,8 @@ let playerSortKey='ovr',playerSortDirection='desc';
 let pendingCoverPlayerId=null;
 let clubsInitialized=false;
 let careerScanWallet='',careerScanning=false,careerScanStop=false,careerScanForce=false;
+let energyPoolScanning=false,energyPoolScanStop=false,energyPoolScanForce=false;
+let energyProjectionCounts={full:{},limited:{}};
 const API_BASE='https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod';
 const PLAYER_PAGE_LIMIT=1500;
 const MAX_PLAYER_PAGES=50;
@@ -2367,8 +2388,8 @@ const ENERGY_SCHEDULE=[
   {day:33,training:false,league:true,cup:false}
 ];
 
-function activeEnergySchedule(){
-  if(!energyLimitedSchedule)return ENERGY_SCHEDULE;
+function energyScheduleForMode(limited){
+  if(!limited)return ENERGY_SCHEDULE;
   let cupsIncluded=0;
   return ENERGY_SCHEDULE.filter(day=>day.day<=30).map(day=>{
     const cup=Boolean(day.cup&&cupsIncluded<6);
@@ -2376,6 +2397,8 @@ function activeEnergySchedule(){
     return{...day,cup};
   });
 }
+
+function activeEnergySchedule(){return energyScheduleForMode(energyLimitedSchedule);}
 
 function toggleEnergyScheduleMode(){
   energyLimitedSchedule=!energyLimitedSchedule;
@@ -2619,6 +2642,113 @@ async function startCareerScan(){
   }
 }
 
+function energyProjectionStorageKey(wallet=careerScanWallet){return`mfl_energy_projection_counts_v1_${String(wallet||'').toLowerCase()}`;}
+
+function loadEnergyProjectionCounts(wallet=careerScanWallet){
+  energyProjectionCounts={full:{},limited:{}};
+  if(!wallet)return;
+  try{
+    const saved=JSON.parse(localStorage.getItem(energyProjectionStorageKey(wallet))||'null');
+    if(saved&&saved.full&&saved.limited)energyProjectionCounts={full:{...saved.full},limited:{...saved.limited}};
+  }catch(error){console.warn('Energy projection cache could not be loaded',error);}
+}
+
+function saveEnergyProjectionCounts(){
+  if(!careerScanWallet)return;
+  try{localStorage.setItem(energyProjectionStorageKey(),JSON.stringify(energyProjectionCounts));}
+  catch(error){console.warn('Energy projection cache could not be saved',error);}
+}
+
+function storedEnergyProjectionCount(modelKey,limited=energyLimitedSchedule){
+  if(!modelKey)return null;
+  const value=energyProjectionCounts[limited?'limited':'full']?.[modelKey];
+  return Number.isFinite(Number(value))?Number(value):null;
+}
+
+function energyPoolReadyCount(profiles){
+  return profiles.reduce((count,profile)=>count+Number(storedEnergyProjectionCount(profile.key,false)!==null&&storedEnergyProjectionCount(profile.key,true)!==null),0);
+}
+
+function updateEnergyPoolScanPanel(progress=null){
+  const panel=document.getElementById('energyPoolScanPanel');
+  if(!panel)return;
+  panel.hidden=viewerMode||!careerScanWallet||!allPlayers.length;
+  if(panel.hidden)return;
+  const profiles=[...energyPoolProfiles().values()],ready=energyPoolReadyCount(profiles),total=profiles.length;
+  const button=document.getElementById('energyPoolScanButton'),status=document.getElementById('energyPoolScanStatus'),eta=document.getElementById('energyPoolScanEta');
+  const percent=progress?(progress.total?Math.round(progress.completed/progress.total*100):100):(total?Math.round(ready/total*100):0);
+  document.getElementById('energyPoolScanFill').style.width=`${Math.max(0,Math.min(100,percent))}%`;
+  document.getElementById('energyPoolScanProgress').setAttribute('aria-valuenow',String(percent));
+  button.disabled=energyPoolScanning||!total;
+  if(progress){
+    status.textContent=`Processing ${progress.completed}/${progress.total} profiles · ${ready}/${total} ready${progress.failures?` · ${progress.failures} failed`:''}`;
+    eta.textContent=progress.etaMs>0?`ETA ${formatCareerDuration(progress.etaMs)}`:'Finishing…';
+    return;
+  }
+  status.textContent=ready?`${ready}/${total} player positions processed`:'Not processed';
+  eta.textContent=ready===total&&total?'Up to date':'ETA —';
+  button.textContent=ready===total&&total?'Refresh energy drain':ready?'Resume energy drain':'Update energy drain';
+}
+
+function pauseEnergyPoolScan(){
+  energyPoolScanStop=true;
+  const button=document.getElementById('energyPoolScanStopButton');
+  button.disabled=true;
+  document.getElementById('energyPoolScanStatus').textContent='Pausing after the current batch…';
+}
+
+async function startEnergyPoolScan(){
+  if(energyPoolScanning||!careerScanWallet||!allPlayers.length)return;
+  const profiles=[...energyPoolProfiles().values()],ready=energyPoolReadyCount(profiles);
+  energyPoolScanForce=ready===profiles.length&&profiles.length>0;
+  const pending=energyPoolScanForce?profiles:profiles.filter(profile=>storedEnergyProjectionCount(profile.key,false)===null||storedEnergyProjectionCount(profile.key,true)===null);
+  if(!pending.length)return;
+  energyPoolScanning=true;energyPoolScanStop=false;
+  const scanButton=document.getElementById('energyPoolScanButton'),stopButton=document.getElementById('energyPoolScanStopButton');
+  scanButton.disabled=true;stopButton.hidden=false;stopButton.disabled=false;
+  const activeKeys=new Set(getEnergyStarters(activeSquad()).map(starter=>starter.modelKey).filter(Boolean));
+  let completed=0,failures=0;
+  const startedAt=Date.now();
+  try{
+    for(let offset=0;offset<pending.length&&!energyPoolScanStop;offset+=12){
+      const batch=pending.slice(offset,offset+12);
+      try{
+        const response=await fetch(ENERGY_MODEL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profiles:batch})});
+        if(!response.ok)throw new Error(`Energy model returned ${response.status}`);
+        const payload=await response.json(),models=new Map((payload.models||[]).map(model=>[model.key,model]));
+        batch.forEach(profile=>{
+          const model=models.get(profile.key);
+          if(!model){failures+=1;return;}
+          energyProjectionCounts.full[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false));
+          energyProjectionCounts.limited[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(true));
+          if(activeKeys.has(profile.key))energyModelCache.set(profile.key,model);
+        });
+      }catch(error){
+        failures+=batch.length;
+        console.warn('Energy drain batch failed',error);
+      }
+      completed+=batch.length;
+      saveEnergyProjectionCounts();
+      const elapsed=Date.now()-startedAt,etaMs=completed?Math.round(elapsed/completed*Math.max(0,pending.length-completed)):0;
+      updateEnergyPoolScanPanel({completed,total:pending.length,failures,etaMs});
+    }
+    if(activeSquadId)renderEnergyPlanner(true);
+    if(document.getElementById('addPlayerModal').classList.contains('open'))applyFilters();
+    const status=document.getElementById('energyPoolScanStatus');
+    if(energyPoolScanStop)status.textContent='Energy scan paused. Progress has been saved.';
+    else status.textContent=`Energy scan complete · ${energyPoolReadyCount(profiles)}/${profiles.length} player positions ready${failures?` · ${failures} failed`:''}`;
+    document.getElementById('energyPoolScanEta').textContent=energyPoolScanStop?'ETA paused':'Up to date';
+  }catch(error){
+    document.getElementById('energyPoolScanStatus').textContent=error.message||'Energy scan failed.';
+    document.getElementById('energyPoolScanEta').textContent='ETA —';
+  }finally{
+    energyPoolScanning=false;energyPoolScanStop=false;energyPoolScanForce=false;
+    stopButton.hidden=true;stopButton.disabled=false;scanButton.disabled=false;
+    const latestReady=energyPoolReadyCount(profiles);
+    scanButton.textContent=latestReady===profiles.length?'Refresh energy drain':latestReady?'Resume energy drain':'Update energy drain';
+  }
+}
+
 function renderCareerSeasonBadge(value,className='sp-seasons'){
   const seasons=Number(value);
   if(!Number.isFinite(seasons)||seasons<1)return`<span class="${className} is-empty" title="Run the optional season scan">—</span>`;
@@ -2750,8 +2880,29 @@ function modalEnergyStarterFor(player,positionFilter){
 
 function modalPlayerLowStartCount(player,positionFilter){
   const starter=modalEnergyStarterFor(player,positionFilter);
+  if(!starter.modelKey)return null;
+  const stored=storedEnergyProjectionCount(starter.modelKey);
+  if(stored!==null)return stored;
+  if(!energyModelCache.has(starter.modelKey))return null;
   const projection=calculateEnergyProjection([starter],activeEnergySchedule());
   return projection.rows.reduce((count,row)=>count+row.matchStarts.filter(match=>match.energies[0]<=ENERGY_LOW_RAW).length,0);
+}
+
+function energyPoolProfiles(){
+  const profiles=new Map(),playersById=new Map(allPlayers.map(player=>[String(player.id),player]));
+  const addProfile=(player,position)=>{
+    if(!player||!position)return;
+    const entry=modalEnergyStarterFor(player,position);
+    if(entry.profile&&entry.modelKey)profiles.set(entry.modelKey,{key:entry.modelKey,...entry.profile});
+  };
+  allPlayers.forEach(player=>{
+    const positions=Array.isArray(player.metadata?.positions)?player.metadata.positions:String(player.positions||'').split(',').map(position=>position.trim()).filter(Boolean);
+    (positions.length?positions:[modalEnergyPositionFor(player,'')]).forEach(position=>addProfile(player,position));
+  });
+  squads.forEach(squad=>['starters','backups','substitutes'].forEach(section=>(squad?.[section]||[]).forEach(slot=>{
+    if(slot&&!slot.isLoan)addProfile(playersById.get(String(slot.playerId)),slot.slotPos);
+  })));
+  return profiles;
 }
 
 function energyModelsPending(starters){
@@ -2759,14 +2910,18 @@ function energyModelsPending(starters){
   return starters.some(entry=>entry.modelKey&&!energyModelCache.has(entry.modelKey)&&now-Number(energyModelFailures.get(entry.modelKey)||0)>60000);
 }
 
-function modelPredictionFor(starter,energyRaw){
-  if(starter.manualDrain||!starter.modelKey)return null;
-  const model=energyModelCache.get(starter.modelKey);
+function modelPredictionFromEnergyModel(starter,model,energyRaw){
+  if(starter.manualDrain)return null;
   if(!model||!Array.isArray(model.observations))return null;
   const standard=predictionFromEnergyObservations(model.observations,energyRaw);
   if(standard)return{...standard,tier:'standard'};
   const widened=predictionFromEnergyObservations(model.widenedObservations,energyRaw);
   return widened?{...widened,tier:'widened'}:null;
+}
+
+function modelPredictionFor(starter,energyRaw){
+  if(!starter.modelKey)return null;
+  return modelPredictionFromEnergyModel(starter,energyModelCache.get(starter.modelKey),energyRaw);
 }
 
 function predictionFromEnergyObservations(observations,energyRaw){
@@ -2786,6 +2941,22 @@ function predictionFromEnergyObservations(observations,energyRaw){
 function energyUseFor(starter,energyRaw){
   const prediction=modelPredictionFor(starter,energyRaw);
   return prediction?{...prediction,source:prediction.tier==='widened'?'widened':'model'}:{drainRaw:Math.round(starter.drain*100),sampleSize:0,source:starter.manualDrain?'manual':'fallback'};
+}
+
+function lowStartCountForEnergyModel(profile,model,schedule){
+  const retirement=Number(profile.retirement),fallbackDrain=retirement===1?7:retirement===2?5:ENERGY_DEFAULT_DRAIN;
+  const starter={manualDrain:false,modelKey:profile.key,drain:fallbackDrain};
+  let energy=ENERGY_MAX_RAW,count=0;
+  schedule.forEach(day=>{
+    if(day.training)energy=Math.round(energy+(ENERGY_MAX_RAW-energy)*0.2);
+    const matchCount=Number(day.league)+Number(day.cup);
+    for(let match=0;match<matchCount;match++){
+      if(energy<=ENERGY_LOW_RAW)count+=1;
+      const prediction=modelPredictionFromEnergyModel(starter,model,energy);
+      energy=Math.max(ENERGY_FLOOR_RAW,energy-(prediction?prediction.drainRaw:Math.round(fallbackDrain*100)));
+    }
+  });
+  return count;
 }
 
 function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
@@ -2834,6 +3005,14 @@ function updatePitchEnergyWarnings(starters,projection){
     const starter=starters[starterIndex];
     if(starter)lowStarts.set(starter.index,(lowStarts.get(starter.index)||0)+1);
   })));
+  let cacheChanged=false;
+  const countBucket=energyProjectionCounts[energyLimitedSchedule?'limited':'full'];
+  starters.forEach(entry=>{
+    if(entry.manualDrain||!entry.modelKey||!energyModelCache.has(entry.modelKey))return;
+    const count=lowStarts.get(entry.index)||0;
+    if(Number(countBucket[entry.modelKey])!==count){countBucket[entry.modelKey]=count;cacheChanged=true;}
+  });
+  if(cacheChanged)saveEnergyProjectionCounts();
   starters.forEach(entry=>{
     const count=lowStarts.get(entry.index)||0;
     if(!count)return;
@@ -3181,6 +3360,7 @@ async function loadPlayers() {
     localStorage.setItem('mfl_last_wallet', wallet);
     careerScanWallet=wallet.toLowerCase();
     applyCareerCache(careerScanWallet);
+    loadEnergyProjectionCounts(careerScanWallet);
     // Restore squads saved for this wallet
     const saved = localStorage.getItem('mfl_squads_' + wallet);
     squads = []; activeSquadId = null; clubsInitialized = false;
@@ -3306,8 +3486,8 @@ document.getElementById('loadSaveInput').addEventListener('change', e => {
 function launchApp() {
   document.getElementById('uploadScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
-  if(!viewerMode){careerScanWallet=(localStorage.getItem('mfl_last_wallet')||careerScanWallet||'').toLowerCase();applyCareerCache(careerScanWallet);updateCareerScanPanel();}
-  else document.getElementById('careerScanPanel').hidden=true;
+  if(!viewerMode){careerScanWallet=(localStorage.getItem('mfl_last_wallet')||careerScanWallet||'').toLowerCase();applyCareerCache(careerScanWallet);loadEnergyProjectionCounts(careerScanWallet);updateCareerScanPanel();updateEnergyPoolScanPanel();}
+  else{document.getElementById('careerScanPanel').hidden=true;document.getElementById('energyPoolScanPanel').hidden=true;}
   const fn = Object.keys(FORMATIONS);
   ['startersFormation','backupsFormation'].forEach(id => {
     const s = document.getElementById(id);
@@ -3420,6 +3600,7 @@ function toggleNextSeason(){
   renderPitch('backups');
   renderSubstitutes();
   renderSquadPlayerList();
+  updateEnergyPoolScanPanel();
 }
 
 function updateFormation(section){
@@ -3458,7 +3639,7 @@ function updateFormation(section){
     document.getElementById('backupsFormation').value=nf;
     renderPitch('backups');
   }
-  renderPitch(section);renderSubstitutes();renderSquadPlayerList();renderPoolSummary();autoSave();
+  renderPitch(section);renderSubstitutes();renderSquadPlayerList();renderPoolSummary();updateEnergyPoolScanPanel();autoSave();
 }
 
 function sectionHasPlayer(squad,section,playerId){
@@ -3668,7 +3849,7 @@ function updatePlayerSortHeaders(){
   document.querySelectorAll('.sort-header[data-sort]').forEach(header=>{
     const active=header.dataset.sort===playerSortKey;
     header.setAttribute('aria-sort',active?(playerSortDirection==='asc'?'ascending':'descending'):'none');
-    const detail=header.dataset.sort==='energy'?'Projected match starts at 60% energy or less using the current model or fallback. ':'';
+    const detail=header.dataset.sort==='energy'?'Processed match starts at 60% energy or less. Run Update energy drain when values are unavailable. ':'';
     header.title=detail+(active?`Sorted ${playerSortDirection==='asc'?'ascending':'descending'}; activate to reverse`:'Activate to sort this column');
     const indicator=header.querySelector('.sort-indicator');
     if(indicator)indicator.textContent=active?(playerSortDirection==='asc'?'▲':'▼'):'';
@@ -3763,9 +3944,10 @@ function applyFilters(){
     };
     const mainPositionChip=positions[0]?makePositionChip(positions[0]):'';
     const otherPositionChips=positions.slice(1).map(makePositionChip).join('');
-    const lowStartCount=modalEnergyCounts.get(p)||0;
+    const lowStartCount=modalEnergyCounts.get(p);
+    const hasEnergyCount=Number.isFinite(lowStartCount);
     const energyPosition=modalEnergyPositionFor(p,pf);
-    const energyTitle=`${lowStartCount} projected match start${lowStartCount===1?'':'s'} at 60% energy or less as ${energyPosition||'the selected role'} using the current model or fallback`;
+    const energyTitle=hasEnergyCount?`${lowStartCount} projected match start${lowStartCount===1?'':'s'} at 60% energy or less as ${energyPosition||'the selected role'}`:`Run Update energy drain to process ${energyPosition||'this role'}`;
     // OOP chips: position filter chip + any Alt Upgrade qualifying OOP positions
     const makeOopChip=(pos,ovr)=>`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pos}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(ovr)}">${ovr}</span></span>`;
     const oopPositions=new Set();
@@ -3774,7 +3956,7 @@ function applyFilters(){
     const extraChip=[...oopPositions].map(pos=>makeOopChip(pos,Math.round(getPosOvr(p,pos)))).join('');
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos pr-pos--main">${mainPositionChip}</div><div class="pr-pos pr-pos--other">${otherPositionChips}${extraChip}</div><div class="pr-energy${lowStartCount?'':' is-clear'}" title="${escAttr(energyTitle)}">${lowStartCount}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos pr-pos--main">${mainPositionChip}</div><div class="pr-pos pr-pos--other">${otherPositionChips}${extraChip}</div><div class="pr-energy${hasEnergyCount?(lowStartCount?'':' is-clear'):' is-pending'}" title="${escAttr(energyTitle)}">${hasEnergyCount?lowStartCount:'—'}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
@@ -3796,7 +3978,7 @@ function assignPlayer(player){
   const form=FORMATIONS[fn];if(!sq[section])sq[section]=new Array(11).fill(null);
   if(addPlayerSlotIdx!==null&&(!sq[section][addPlayerSlotIdx]||isSlotIgnoredNextSeason(sq[section][addPlayerSlotIdx]))){sq[section][addPlayerSlotIdx]={playerId:player.id,slotPos:form.positions[addPlayerSlotIdx]};}
   else{const ei=sq[section].findIndex(s=>!s||isSlotIgnoredNextSeason(s));if(ei===-1){alert('All slots filled.');return;}sq[section][ei]={playerId:player.id,slotPos:form.positions[ei]};}
-  closeAddPlayerModal();renderPitch(section);renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();
+  closeAddPlayerModal();renderPitch(section);renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();updateEnergyPoolScanPanel();autoSave();
 }
 
 function openLoanModal(){const sq=squads.find(s=>s.id===activeSquadId);if(!sq)return;updateLoanSlots();document.getElementById('loanModal').classList.add('open');}
@@ -3997,7 +4179,7 @@ function autoSave(){
 function exportSession(){const d={version:4,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId,clubsInitialized};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
 function importSession(){document.getElementById('importInput').click();}
 document.getElementById('importInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=Array.isArray(d.players)?d.players:[];squads=Array.isArray(d.squads)?d.squads.filter(Boolean):[];activeSquadId=d.activeSquadId||null;clubsInitialized=d.clubsInitialized===true;sortSquads();renderPoolSummary();renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage();autoSave();}catch(e){alert('Invalid save');}};r.readAsText(f);e.target.value='';});
-function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;squads=[];activeSquadId=null;allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
+function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 if(viewerMode)startDelegationSquadViewer();
 </script>
 <script src="./tool-bridge.js?v=2.0.2"></script>
