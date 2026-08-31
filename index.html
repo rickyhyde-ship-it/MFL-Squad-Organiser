@@ -159,8 +159,9 @@ body {
 .pitch-slot-name { font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68px; }
 .pitch-slot-ovr { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; text-align: center; }
 .pitch-slot-ovr-value { grid-column: 2; }
-.pitch-slot-ovr-alerts { grid-column: 3; display: inline-flex; align-items: baseline; justify-self: start; gap: 3px; min-width: 0; margin-left: 3px; color: var(--red); font-size: 8px; font-weight: 700; }
-.pitch-slot-energy-warning { color: var(--red); }
+.pitch-slot-ovr-alerts { grid-column: 3; display: inline-flex; align-items: baseline; justify-self: start; gap: 3px; min-width: 0; margin-left: 3px; color: var(--red); font-size: inherit; font-weight: 700; }
+.pitch-slot-training-warning { font-size: 8px; }
+.pitch-slot-energy-warning { color: var(--red); line-height: 1; }
 .pitch-slot-retire { font-size: 9px; margin-top: 1px; }
 .pitch-slot-remove { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); color: #fff; font-size: 10px; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
 .pitch-slot-card:hover .pitch-slot-remove { display: flex; }
@@ -251,6 +252,7 @@ body {
 .sort-header--name { flex:1; }
 .sort-header--position { width:96px; flex:0 0 96px; }
 .player-table-header__other-position { width:180px; flex:0 0 180px; }
+.sort-header--energy { width:46px; flex:0 0 46px; justify-content:center; }
 .sort-header--progression { width:48px; justify-content:center; }
 .sort-header--seasons { width:46px; justify-content:center; }
 .sort-header--stat { width:24px; justify-content:center; }
@@ -265,6 +267,8 @@ body {
 .pr-pos { display:flex; flex-wrap:wrap; gap:3px; align-items:center; min-width:0; }
 .pr-pos--main { width:96px; flex:0 0 96px; }
 .pr-pos--other { width:180px; flex:0 0 180px; }
+.pr-energy { width:46px; flex:0 0 46px; color:var(--red); font:700 11px 'JetBrains Mono',monospace; text-align:center; }
+.pr-energy.is-clear { color:var(--text-muted); }
 .pos-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 5px; border-radius:4px; background:var(--bg-tertiary); font-family:'JetBrains Mono',monospace; font-size:10px; white-space:nowrap; }
 .pos-chip__label { color:var(--text-muted); }
 .pos-chip__ovr { font-weight:700; }
@@ -2270,7 +2274,7 @@ button.substitute-card:not(.is-filled):focus-visible {
       <span class="alt-upgrade-controls" id="altUpgradeControls" hidden><label class="filter-label" for="filterUpgradeThreshold">Custom threshold</label><span class="alt-upgrade-threshold"><input class="filter-input" id="filterUpgradeThreshold" type="number" min="1" max="200" step="1" value="95" aria-label="Alternate upgrade threshold percentage" oninput="applyFilters()"><span aria-hidden="true">%</span></span></span>
     </div>
     <div class="player-table-header" aria-label="Player sort controls">
-      <button class="sort-header sort-header--ovr" type="button" data-sort="ovr" onclick="setPlayerSort('ovr')">OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--name" type="button" data-sort="name" onclick="setPlayerSort('name')">Name<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--position" type="button" data-sort="position" onclick="setPlayerSort('position')">Main Pos / OVR<span class="sort-indicator" aria-hidden="true"></span></button><span class="player-table-header__other-position">Other Pos / OVR</span><button class="sort-header sort-header--progression" type="button" data-sort="progression" onclick="setPlayerSort('progression')">All Δ<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--seasons" type="button" data-sort="seasons" onclick="setPlayerSort('seasons')">Seasons<span class="sort-indicator" aria-hidden="true"></span></button><div class="player-table-stat-headers"><button class="sort-header sort-header--stat" type="button" data-sort="pace" onclick="setPlayerSort('pace')">PAC<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="dribbling" onclick="setPlayerSort('dribbling')">DRI<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="passing" onclick="setPlayerSort('passing')">PAS<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="shooting" onclick="setPlayerSort('shooting')">SHO<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="defense" onclick="setPlayerSort('defense')">DEF<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="physical" onclick="setPlayerSort('physical')">PHY<span class="sort-indicator" aria-hidden="true"></span></button></div><button class="sort-header sort-header--age" type="button" data-sort="age" onclick="setPlayerSort('age')">Age<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--nationality" type="button" data-sort="nationality" onclick="setPlayerSort('nationality')">Nat<span class="sort-indicator" aria-hidden="true"></span></button>
+      <button class="sort-header sort-header--ovr" type="button" data-sort="ovr" onclick="setPlayerSort('ovr')">OVR<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--name" type="button" data-sort="name" onclick="setPlayerSort('name')">Name<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--position" type="button" data-sort="position" onclick="setPlayerSort('position')">Main Pos / OVR<span class="sort-indicator" aria-hidden="true"></span></button><span class="player-table-header__other-position">Other Pos / OVR</span><button class="sort-header sort-header--energy" type="button" data-sort="energy" onclick="setPlayerSort('energy')" aria-label="Projected match starts at 60% energy or less; sort column">≤60%<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--progression" type="button" data-sort="progression" onclick="setPlayerSort('progression')">All Δ<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--seasons" type="button" data-sort="seasons" onclick="setPlayerSort('seasons')">Seasons<span class="sort-indicator" aria-hidden="true"></span></button><div class="player-table-stat-headers"><button class="sort-header sort-header--stat" type="button" data-sort="pace" onclick="setPlayerSort('pace')">PAC<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="dribbling" onclick="setPlayerSort('dribbling')">DRI<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="passing" onclick="setPlayerSort('passing')">PAS<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="shooting" onclick="setPlayerSort('shooting')">SHO<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="defense" onclick="setPlayerSort('defense')">DEF<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--stat" type="button" data-sort="physical" onclick="setPlayerSort('physical')">PHY<span class="sort-indicator" aria-hidden="true"></span></button></div><button class="sort-header sort-header--age" type="button" data-sort="age" onclick="setPlayerSort('age')">Age<span class="sort-indicator" aria-hidden="true"></span></button><button class="sort-header sort-header--nationality" type="button" data-sort="nationality" onclick="setPlayerSort('nationality')">Nat<span class="sort-indicator" aria-hidden="true"></span></button>
     </div>
     <div class="modal-body" id="playerListBody"></div>
   </div>
@@ -2732,6 +2736,22 @@ function loadEnergyModels(starters){
     energyModelRequests.delete(requestKey);
     renderEnergyPlanner(true);
   });
+}
+
+function modalEnergyPositionFor(player,positionFilter){
+  return String(positionFilter||player?.metadata?.positions?.[0]||String(player?.positions||'').split(',')[0]||'').trim().toUpperCase();
+}
+
+function modalEnergyStarterFor(player,positionFilter){
+  const entry={slot:{slotPos:modalEnergyPositionFor(player,positionFilter)},index:0,player,drain:defaultEnergyDrainFor(player),manualDrain:false};
+  const profile=energyProfileFor(entry);
+  return{...entry,profile,modelKey:profile?energyModelKey(profile):null};
+}
+
+function modalPlayerLowStartCount(player,positionFilter){
+  const starter=modalEnergyStarterFor(player,positionFilter);
+  const projection=calculateEnergyProjection([starter],activeEnergySchedule());
+  return projection.rows.reduce((count,row)=>count+row.matchStarts.filter(match=>match.energies[0]<=ENERGY_LOW_RAW).length,0);
 }
 
 function energyModelsPending(starters){
@@ -3648,13 +3668,14 @@ function updatePlayerSortHeaders(){
   document.querySelectorAll('.sort-header[data-sort]').forEach(header=>{
     const active=header.dataset.sort===playerSortKey;
     header.setAttribute('aria-sort',active?(playerSortDirection==='asc'?'ascending':'descending'):'none');
-    header.title=active?`Sorted ${playerSortDirection==='asc'?'ascending':'descending'}; activate to reverse`:'Activate to sort this column';
+    const detail=header.dataset.sort==='energy'?'Projected match starts at 60% energy or less using the current model or fallback. ':'';
+    header.title=detail+(active?`Sorted ${playerSortDirection==='asc'?'ascending':'descending'}; activate to reverse`:'Activate to sort this column');
     const indicator=header.querySelector('.sort-indicator');
     if(indicator)indicator.textContent=active?(playerSortDirection==='asc'?'▲':'▼'):'';
   });
 }
 
-function playerSortValue(player,key,positionFilter){
+function playerSortValue(player,key,positionFilter,energyCounts){
   const stats=player.stats||{};
   switch(key){
     case'ovr':return Number(player.ovr);
@@ -3663,6 +3684,7 @@ function playerSortValue(player,key,positionFilter){
       const mainPosition=(player.metadata?.positions?.[0]||String(player.positions||'').split(',')[0]||'').trim();
       return mainPosition?Number(getPosOvr(player,mainPosition)):null;
     }
+    case'energy':return energyCounts?.get(player)??modalPlayerLowStartCount(player,positionFilter);
     case'progression':return playerProgression(player);
     case'seasons':return projectedPlayerSeasons(player);
     case'pace':return Number(stats.pace);
@@ -3677,10 +3699,10 @@ function playerSortValue(player,key,positionFilter){
   }
 }
 
-function sortPlayersForModal(players,positionFilter){
+function sortPlayersForModal(players,positionFilter,energyCounts){
   const direction=playerSortDirection==='asc'?1:-1;
   players.sort((a,b)=>{
-    const aValue=playerSortValue(a,playerSortKey,positionFilter),bValue=playerSortValue(b,playerSortKey,positionFilter);
+    const aValue=playerSortValue(a,playerSortKey,positionFilter,energyCounts),bValue=playerSortValue(b,playerSortKey,positionFilter,energyCounts);
     const aMissing=aValue===null||aValue===undefined||(typeof aValue==='number'&&!Number.isFinite(aValue));
     const bMissing=bValue===null||bValue===undefined||(typeof bValue==='number'&&!Number.isFinite(bValue));
     if(aMissing!==bMissing)return aMissing?1:-1;
@@ -3722,7 +3744,8 @@ function applyFilters(){
     }
     return true;
   });
-  sortPlayersForModal(avail,pf);
+  const modalEnergyCounts=new Map(avail.map(player=>[player,modalPlayerLowStartCount(player,pf)]));
+  sortPlayersForModal(avail,pf,modalEnergyCounts);
   updatePlayerSortHeaders();
   const body=document.getElementById('playerListBody');body.innerHTML='';
   avail.forEach(p=>{
@@ -3740,6 +3763,9 @@ function applyFilters(){
     };
     const mainPositionChip=positions[0]?makePositionChip(positions[0]):'';
     const otherPositionChips=positions.slice(1).map(makePositionChip).join('');
+    const lowStartCount=modalEnergyCounts.get(p)||0;
+    const energyPosition=modalEnergyPositionFor(p,pf);
+    const energyTitle=`${lowStartCount} projected match start${lowStartCount===1?'':'s'} at 60% energy or less as ${energyPosition||'the selected role'} using the current model or fallback`;
     // OOP chips: position filter chip + any Alt Upgrade qualifying OOP positions
     const makeOopChip=(pos,ovr)=>`<span class="pos-chip" style="background:rgba(255,68,68,0.1);border:1px dashed rgba(255,68,68,0.5)" title="Out of position"><span class="pos-chip__label" style="color:var(--oop-color)">${pos}</span><span style="font-size:7px;color:var(--oop-color);font-weight:700;margin-left:1px">OOP</span><span class="pos-chip__ovr" style="color:${getOvrColor(ovr)}">${ovr}</span></span>`;
     const oopPositions=new Set();
@@ -3748,7 +3774,7 @@ function applyFilters(){
     const extraChip=[...oopPositions].map(pos=>makeOopChip(pos,Math.round(getPosOvr(p,pos)))).join('');
     let statsH='';
     if(p.stats){const s=p.stats,vals=[s.pace,s.defending1,s.passing,s.shooting,s.defending2,s.physical];statsH='<div class="pr-stats">'+vals.map(v=>`<div class="pr-stat" style="color:${getOvrColor(v)}">${v}</div>`).join('')+'</div>';}
-    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos pr-pos--main">${mainPositionChip}</div><div class="pr-pos pr-pos--other">${otherPositionChips}${extraChip}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
+    div.innerHTML=`<div class="pr-ovr" style="color:${getOvrColor(displayOvr)}">${displayOvr}</div><div class="pr-name">${escHtml(p.name)}</div><div class="pr-pos pr-pos--main">${mainPositionChip}</div><div class="pr-pos pr-pos--other">${otherPositionChips}${extraChip}</div><div class="pr-energy${lowStartCount?'':' is-clear'}" title="${escAttr(energyTitle)}">${lowStartCount}</div>${renderProgressionBadge(p.careerProgression,'pr-progression')}${renderCareerSeasonBadge(p.seasonsInGame,'pr-seasons')}${statsH}<div class="pr-age">${p.age||''}${getRetireIcon(p.retireIn)}</div><div class="pr-nat">${formatNat(p.nationality)}</div>`;
     div.addEventListener('click',()=>assignPlayer(p));body.appendChild(div);
   });
   document.getElementById('filterCount').textContent=avail.length+' player'+(avail.length!==1?'s':'');
