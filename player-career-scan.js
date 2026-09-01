@@ -1,8 +1,8 @@
 (function (global) {
   "use strict";
 
-  const MAX_CALLS_PER_MINUTE = 79;
-  const REQUEST_INTERVAL_MS = 775;
+  const MAX_CALLS_PER_MINUTE = 59;
+  const REQUEST_INTERVAL_MS = Math.ceil(60000 / MAX_CALLS_PER_MINUTE);
   const CACHE_VERSION = 1;
   const CACHE_PREFIX = "agentHubSeasonsInGame:v1:";
 
@@ -12,7 +12,7 @@
   }
 
   function emptyCache() {
-    return { version: CACHE_VERSION, updatedAt: null, seasons: {} };
+    return { version: CACHE_VERSION, updatedAt: null, seasons: {}, failures: [] };
   }
 
   function load(wallet) {
@@ -28,6 +28,7 @@
           const number = Number(value);
           return Number.isFinite(number) && number >= 1 ? [[String(id), Math.round(number)]] : [];
         })),
+        failures: Array.from(new Set((Array.isArray(parsed.failures) ? parsed.failures : []).map(String).filter(Boolean))),
       };
     } catch (error) {
       return emptyCache();
@@ -42,6 +43,7 @@
         version: CACHE_VERSION,
         updatedAt: Date.now(),
         seasons: cache.seasons || {},
+        failures: Array.isArray(cache.failures) ? cache.failures : [],
       }));
     } catch (error) {}
   }
@@ -70,6 +72,11 @@
     return players.reduce((count, player) => count + (Object.prototype.hasOwnProperty.call(cache.seasons, String(player.id)) ? 1 : 0), 0);
   }
 
+  function countFailed(players, cache) {
+    const playerIds = new Set(players.map((player) => String(player.id)));
+    return (Array.isArray(cache.failures) ? cache.failures : []).reduce((count, id) => count + (playerIds.has(String(id)) ? 1 : 0), 0);
+  }
+
   async function scan(options) {
     const wallet = normalizeWallet(options.wallet);
     if (!wallet) throw new Error("A valid wallet address is required for the season scan.");
@@ -78,9 +85,12 @@
 
     const uniquePlayers = Array.from(new Map((options.players || []).filter((player) => player?.id).map((player) => [String(player.id), player])).values());
     const cache = load(wallet);
-    const queue = options.force
-      ? uniquePlayers
-      : uniquePlayers.filter((player) => !Object.prototype.hasOwnProperty.call(cache.seasons, String(player.id)));
+    const failedIds = new Set(cache.failures || []);
+    const queue = options.retryFailed
+      ? uniquePlayers.filter((player) => failedIds.has(String(player.id)))
+      : options.force
+        ? uniquePlayers
+        : uniquePlayers.filter((player) => !Object.prototype.hasOwnProperty.call(cache.seasons, String(player.id)));
     const total = queue.length;
     const startedAt = Date.now();
     let completed = 0;
@@ -96,6 +106,7 @@
         completed,
         total,
         failures,
+        failedCount: countFailed(uniquePlayers, cache),
         cached: countCached(uniquePlayers, cache),
         playerCount: uniquePlayers.length,
         etaMs: Math.ceil((total - completed) * cadence),
@@ -127,15 +138,24 @@
         });
         if (response.status === 429) {
           rateLimited = true;
+          failures += 1;
+          failedIds.add(String(player.id));
+          cache.failures = Array.from(failedIds);
+          completed += 1;
+          save(wallet, cache);
+          report({ playerId: String(player.id), seasons });
           break;
         }
         if (!response.ok) throw new Error(`Player history API failed with ${response.status}.`);
         seasons = calculate(player, await response.json());
         if (seasons === null) throw new Error("Player history did not include a usable INITIAL age.");
         cache.seasons[String(player.id)] = seasons;
+        failedIds.delete(String(player.id));
       } catch (error) {
         failures += 1;
+        failedIds.add(String(player.id));
       }
+      cache.failures = Array.from(failedIds);
       completed += 1;
       if (completed % 5 === 0) save(wallet, cache);
       report({ playerId: String(player.id), seasons });
@@ -153,6 +173,7 @@
     save,
     calculate,
     countCached,
+    countFailed,
     scan,
   });
 })(window);

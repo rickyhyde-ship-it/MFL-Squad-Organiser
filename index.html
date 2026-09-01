@@ -2183,10 +2183,11 @@ button.substitute-card:not(.is-filled):focus-visible {
       <section class="career-scan" id="careerScanPanel" aria-label="Seasons in game scan" hidden>
         <div>
           <div class="career-scan__title">Seasons in game <span class="career-scan__optional">Optional scan</span></div>
-          <div class="career-scan__warning">Checks each player’s history at no more than 79 API calls per minute. Large wallets could take a few minutes to update.</div>
+          <div class="career-scan__warning">Checks each player’s history at no more than 59 API calls per 60 seconds. Large wallets could take a few minutes to update.</div>
         </div>
         <div class="career-scan__actions">
           <button class="btn btn-accent" type="button" id="careerScanButton" onclick="startCareerScan()">Scan seasons</button>
+          <button class="btn" type="button" id="careerScanRetryButton" onclick="retryFailedCareerScan()" hidden>Retry failed</button>
           <button class="btn" type="button" id="careerScanStopButton" onclick="pauseCareerScan()" hidden>Pause</button>
         </div>
         <div class="career-scan__progress">
@@ -2325,14 +2326,14 @@ button.substitute-card:not(.is-filled):focus-visible {
 <input type="file" id="importInput" accept=".json" style="display:none">
 <div class="copied-toast" id="copiedToast">Copied!</div>
 
-<script src="./player-career-scan.js?v=1.0.0"></script>
+<script src="./player-career-scan.js?v=1.1.0"></script>
 <script>
 let allPlayers=[], squads=[], activeSquadId=null, addPlayerTarget='starters', addPlayerSlotIdx=null;
 let dragSection=null, dragIdx=null, upgradeFilterOn=false, loanLookupPlayer=null, nextSeasonMode=false;
 let playerSortKey='ovr',playerSortDirection='desc';
 let pendingCoverPlayerId=null;
 let clubsInitialized=false;
-let careerScanWallet='',careerScanning=false,careerScanStop=false,careerScanForce=false;
+let careerScanWallet='',careerScanning=false,careerScanStop=false,careerScanForce=false,careerScanRetryOnly=false;
 let energyPoolScanning=false,energyPoolScanStop=false,energyPoolScanForce=false;
 let energyProjectionCounts={full:{},limited:{}};
 const API_BASE='https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod';
@@ -2577,20 +2578,24 @@ function updateCareerScanPanel(progress=null){
   const scanner=window.AgentHubCareerScan,panel=document.getElementById('careerScanPanel');
   panel.hidden=viewerMode||!careerScanWallet||!allPlayers.length;
   if(panel.hidden)return;
-  const button=document.getElementById('careerScanButton'),status=document.getElementById('careerScanStatus'),eta=document.getElementById('careerScanEta');
-  if(!scanner){button.disabled=true;status.textContent='Season scanner unavailable';eta.textContent='ETA —';return;}
+  const button=document.getElementById('careerScanButton'),retryButton=document.getElementById('careerScanRetryButton'),status=document.getElementById('careerScanStatus'),eta=document.getElementById('careerScanEta');
+  if(!scanner){button.disabled=true;retryButton.hidden=true;status.textContent='Season scanner unavailable';eta.textContent='ETA —';return;}
   const cache=progress?.cache||scanner.load(careerScanWallet);
   const cached=progress?.cached??scanner.countCached(allPlayers,cache),totalPlayers=allPlayers.length;
-  const percent=progress&&careerScanForce?(progress.total?Math.round(progress.completed/progress.total*100):100):Math.round(cached/totalPlayers*100);
+  const failed=progress?.failedCount??scanner.countFailed(allPlayers,cache);
+  const percent=progress&&(careerScanForce||careerScanRetryOnly)?(progress.total?Math.round(progress.completed/progress.total*100):100):Math.round(cached/totalPlayers*100);
   document.getElementById('careerScanFill').style.width=`${Math.max(0,Math.min(100,percent))}%`;
   document.getElementById('careerScanProgress').setAttribute('aria-valuenow',String(percent));
+  retryButton.hidden=!failed;
+  retryButton.disabled=careerScanning;
+  retryButton.textContent=failed?`Retry failed (${failed})`:'Retry failed';
   if(progress){
     status.textContent=`Scanning ${progress.completed}/${progress.total} · ${cached}/${totalPlayers} ready${progress.failures?` · ${progress.failures} failed`:''}`;
     eta.textContent=progress.etaMs>0?`ETA ${formatCareerDuration(progress.etaMs)}`:'Finishing…';
     return;
   }
   const remaining=Math.max(0,totalPlayers-cached);
-  status.textContent=cached?`${cached}/${totalPlayers} players scanned`:'Not scanned';
+  status.textContent=cached?`${cached}/${totalPlayers} players scanned${failed?` · ${failed} failed`:''}`:'Not scanned';
   eta.textContent=remaining?`ETA ${formatCareerDuration(remaining*scanner.REQUEST_INTERVAL_MS)}`:'Up to date';
   button.textContent=cached===totalPlayers?'Refresh scan':cached?'Resume scan':'Scan seasons';
   button.disabled=careerScanning;
@@ -2603,20 +2608,27 @@ function pauseCareerScan(){
   document.getElementById('careerScanStatus').textContent='Pausing after the current request…';
 }
 
-async function startCareerScan(){
+function retryFailedCareerScan(){
+  return startCareerScan('failed');
+}
+
+async function startCareerScan(mode='auto'){
   const scanner=window.AgentHubCareerScan;
   if(!scanner||careerScanning||!careerScanWallet||!allPlayers.length)return;
   const cache=scanner.load(careerScanWallet),cached=scanner.countCached(allPlayers,cache);
-  careerScanForce=cached===allPlayers.length;
+  careerScanRetryOnly=mode==='failed';
+  if(careerScanRetryOnly&&!scanner.countFailed(allPlayers,cache))return;
+  careerScanForce=!careerScanRetryOnly&&cached===allPlayers.length;
   careerScanning=true;careerScanStop=false;
-  const scanButton=document.getElementById('careerScanButton'),stopButton=document.getElementById('careerScanStopButton');
-  scanButton.disabled=true;stopButton.hidden=false;stopButton.disabled=false;
+  const scanButton=document.getElementById('careerScanButton'),retryButton=document.getElementById('careerScanRetryButton'),stopButton=document.getElementById('careerScanStopButton');
+  scanButton.disabled=true;retryButton.disabled=true;stopButton.hidden=false;stopButton.disabled=false;
   try{
     const result=await scanner.scan({
       wallet:careerScanWallet,
       players:allPlayers,
       apiBase:API_BASE,
       force:careerScanForce,
+      retryFailed:careerScanRetryOnly,
       shouldStop:()=>careerScanStop,
       onProgress:progress=>{
         if(progress.playerId&&progress.seasons!==null){const player=allPlayers.find(item=>String(item.id)===progress.playerId);if(player)player.seasonsInGame=progress.seasons;}
@@ -2629,7 +2641,7 @@ async function startCareerScan(){
     if(document.getElementById('addPlayerModal').classList.contains('open'))applyFilters();
     autoSave();
     const ready=scanner.countCached(allPlayers,result.cache),status=document.getElementById('careerScanStatus');
-    if(result.rateLimited)status.textContent='API rate-limit response received. Scan paused; resume in one minute.';
+    if(result.rateLimited)status.textContent='API rate-limit response received. Scan paused; retry the failed request in one minute.';
     else if(result.cancelled)status.textContent='Scan paused. Progress has been saved.';
     else status.textContent=`Scan complete · ${ready}/${allPlayers.length} players ready${result.failures?` · ${result.failures} failed`:''}`;
     document.getElementById('careerScanEta').textContent=result.cancelled||result.rateLimited?'ETA paused':'Up to date';
@@ -2637,10 +2649,12 @@ async function startCareerScan(){
     document.getElementById('careerScanStatus').textContent=error.message||'Season scan failed.';
     document.getElementById('careerScanEta').textContent='ETA —';
   }finally{
-    careerScanning=false;careerScanStop=false;careerScanForce=false;
+    careerScanning=false;careerScanStop=false;careerScanForce=false;careerScanRetryOnly=false;
     stopButton.hidden=true;stopButton.disabled=false;scanButton.disabled=false;
     const latest=scanner.load(careerScanWallet),ready=scanner.countCached(allPlayers,latest);
+    const failed=scanner.countFailed(allPlayers,latest);
     scanButton.textContent=ready===allPlayers.length?'Refresh scan':ready?'Resume scan':'Scan seasons';
+    retryButton.hidden=!failed;retryButton.disabled=false;retryButton.textContent=failed?`Retry failed (${failed})`:'Retry failed';
   }
 }
 
