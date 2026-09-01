@@ -682,6 +682,56 @@ body::after {
 
 .squad-list {
   padding: 8px;
+  scrollbar-color: rgba(192,132,252,.72) rgba(2,7,13,.42);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.squad-list::-webkit-scrollbar { width: 8px; }
+.squad-list::-webkit-scrollbar-track {
+  border-left: 1px solid rgba(151,178,199,.08);
+  background: rgba(2,7,13,.42);
+}
+.squad-list::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(2,7,13,.42);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(192,132,252,.82), rgba(111,53,158,.82));
+}
+.squad-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #d8b4fe, #8b5cf6);
+}
+.squad-list:focus-visible {
+  outline: 2px solid rgba(192,132,252,.72);
+  outline-offset: -2px;
+}
+
+@media (min-width: 769px) {
+  .main-layout {
+    height: calc(100vh - 121px) !important;
+    height: calc(100dvh - 121px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .squad-nav {
+    min-height: 0;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .squad-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .squad-view {
+    max-height: 100% !important;
+    overflow-y: auto !important;
+  }
 }
 
 .club-toolbar {
@@ -1547,8 +1597,9 @@ button.substitute-card:not(.is-filled):focus-visible {
   .squad-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    max-height: 210px;
-    overflow-y: auto;
+    max-height: 210px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
 
   .squad-view {
@@ -1664,7 +1715,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
   .squad-list {
     grid-template-columns: 1fr;
-    max-height: 190px;
+    max-height: 190px !important;
   }
 
   .squad-actions {
@@ -2177,7 +2228,7 @@ button.substitute-card:not(.is-filled):focus-visible {
         <button type="button" class="btn" onclick="deleteAllClubs()" style="border-color:rgba(248,113,113,.45);color:#fca5a5">Delete All Clubs</button>
       </div>
       <div class="club-sync-status" id="clubSyncStatus" role="status" aria-live="polite"></div>
-      <div class="squad-list" id="squadList"></div>
+      <div class="squad-list" id="squadList" role="region" aria-label="Owned clubs list" tabindex="0"></div>
     </div>
     <div class="squad-view" id="squadView">
       <section class="career-scan" id="careerScanPanel" aria-label="Seasons in game scan" hidden>
