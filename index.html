@@ -2250,7 +2250,7 @@ button.substitute-card:not(.is-filled):focus-visible {
       <section class="career-scan energy-pool-scan" id="energyPoolScanPanel" aria-label="Energy drain scan" hidden>
         <div>
           <div class="career-scan__title">Energy drain <span class="career-scan__optional">Optional scan</span></div>
-          <div class="career-scan__warning">Processes every player’s registered positions with the historic energy model, then stores compact ≤60% projections so the player list matches the squad planner.</div>
+          <div class="career-scan__warning">Processes every player’s registered positions using both historic energy datasets, then stores compact ≤60% projections so the player list matches the squad planner.</div>
         </div>
         <div class="career-scan__actions">
           <button class="btn btn-accent" type="button" id="energyPoolScanButton" onclick="startEnergyPoolScan()">Update energy drain</button>
@@ -2400,7 +2400,12 @@ const ENERGY_FLOOR_RAW=1500;
 const ENERGY_LOW_RAW=6000;
 const ENERGY_MATCH_TOLERANCE_RAW=300;
 const ENERGY_POOL_BATCH_SIZE=11;
-const ENERGY_MODEL_API='https://mfl-energy-crawler.ricky-hyde-selling.workers.dev/api/energy-models';
+// These completed collection windows do not overlap, so their sample counts can be pooled.
+const ENERGY_MODEL_SOURCES=[
+  {label:'12–29 Aug 2026',url:'https://mfl-energy-crawler.ricky-hyde-selling.workers.dev/api/energy-models'},
+  {label:'1 Jul–5 Aug 2026',url:'https://mfl-energy-crawler-jul-aug-2026.ricky-hyde-selling.workers.dev/api/energy-models'}
+];
+const ENERGY_MODEL_RETRY_MS=60000;
 const energyModelCache=new Map();
 const energyModelRequests=new Set();
 const energyModelFailures=new Map();
@@ -2709,7 +2714,8 @@ async function startCareerScan(mode='auto'){
   }
 }
 
-function energyProjectionStorageKey(wallet=careerScanWallet){return`mfl_energy_projection_counts_v1_${String(wallet||'').toLowerCase()}`;}
+// v2 replaces projections calculated with only the August collection.
+function energyProjectionStorageKey(wallet=careerScanWallet){return`mfl_energy_projection_counts_v2_${String(wallet||'').toLowerCase()}`;}
 
 function loadEnergyProjectionCounts(wallet=careerScanWallet){
   energyProjectionCounts={full:{},limited:{}};
@@ -2780,15 +2786,15 @@ async function startEnergyPoolScan(){
     for(let offset=0;offset<pending.length&&!energyPoolScanStop;offset+=ENERGY_POOL_BATCH_SIZE){
       const batch=pending.slice(offset,offset+ENERGY_POOL_BATCH_SIZE);
       try{
-        const response=await fetch(ENERGY_MODEL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profiles:batch})});
-        if(!response.ok)throw new Error(`Energy model returned ${response.status}`);
-        const payload=await response.json(),models=new Map((payload.models||[]).map(model=>[model.key,model]));
+        const payload=await fetchPooledEnergyModels(batch),models=new Map(payload.models.map(model=>[model.key,model]));
         batch.forEach(profile=>{
           const model=models.get(profile.key);
           if(!model){failures+=1;return;}
+          if(activeKeys.has(profile.key))cacheEnergyModel(model);
+          // Partial evidence can power the planner, but must remain retryable in the pool scan.
+          if(!model.complete){failures+=1;return;}
           energyProjectionCounts.full[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false));
           energyProjectionCounts.limited[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(true));
-          if(activeKeys.has(profile.key))energyModelCache.set(profile.key,model);
         });
       }catch(error){
         failures+=batch.length;
@@ -2904,28 +2910,78 @@ function energyProfileFor(entry){
 
 function energyModelKey(profile){return`${profile.position}|${profile.overall}|${profile.physical}|${profile.retirement}`;}
 
+function mergeEnergyObservations(models,field){
+  const byEnergy=new Map();
+  models.forEach(model=>(model[field]||[]).forEach(observation=>{
+    const {energyRaw,averageDrainRaw,sampleSize}=observation;
+    if(!Number.isInteger(energyRaw)||!Number.isFinite(averageDrainRaw)||!Number.isInteger(sampleSize)||sampleSize<=0)return;
+    const total=byEnergy.get(energyRaw)||{energyRaw,weightedDrainRaw:0,sampleSize:0};
+    total.weightedDrainRaw+=averageDrainRaw*sampleSize;
+    total.sampleSize+=sampleSize;
+    byEnergy.set(energyRaw,total);
+  }));
+  // Keep precision here; round only when predicting the drain for a match.
+  return[...byEnergy.values()].sort((a,b)=>a.energyRaw-b.energyRaw).map(total=>({energyRaw:total.energyRaw,averageDrainRaw:total.weightedDrainRaw/total.sampleSize,sampleSize:total.sampleSize}));
+}
+
+async function fetchPooledEnergyModels(profiles){
+  const body=JSON.stringify({profiles});
+  const results=await Promise.allSettled(ENERGY_MODEL_SOURCES.map(async source=>{
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+    try{
+      const response=await fetch(source.url,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:controller.signal});
+      if(!response.ok)throw new Error(`${source.label}: energy model returned ${response.status}`);
+      const payload=await response.json();
+      if(!Array.isArray(payload.models))throw new Error(`${source.label}: missing energy models`);
+      const models=new Map(payload.models.map(model=>[model.key,model]));
+      if(profiles.some(profile=>!Array.isArray(models.get(profile.key)?.observations)||!Array.isArray(models.get(profile.key)?.widenedObservations)))throw new Error(`${source.label}: incomplete energy models`);
+      return models;
+    }finally{clearTimeout(timeout);}
+  }));
+  const available=results.filter(result=>result.status==='fulfilled').map(result=>result.value);
+  const missingSources=results.flatMap((result,index)=>result.status==='rejected'?[ENERGY_MODEL_SOURCES[index].label]:[]);
+  if(!available.length)throw new Error('All energy datasets are unavailable');
+  return{models:profiles.map(profile=>{
+    const models=available.map(source=>source.get(profile.key));
+    const pooled={...models[0],sourceCount:models.length,complete:missingSources.length===0,missingSources};
+    ['profileSamples','usableProfileSamples','widenedProfileSamples','widenedUsableProfileSamples'].forEach(field=>{pooled[field]=models.reduce((sum,model)=>sum+(Number(model[field])||0),0);});
+    // Widened evidence includes standard evidence: keep the two tiers separate.
+    pooled.observations=mergeEnergyObservations(models,'observations');
+    pooled.widenedObservations=mergeEnergyObservations(models,'widenedObservations');
+    return pooled;
+  })};
+}
+
+function cacheEnergyModel(model){
+  // A concurrent refresh with one source offline must not replace a complete pooled model.
+  if(!model.complete&&energyModelCache.get(model.key)?.complete)return;
+  energyModelCache.set(model.key,model);
+  if(model.complete)energyModelFailures.delete(model.key);
+  else energyModelFailures.set(model.key,Date.now());
+}
+
+function energyModelsReadyMessage(starters){
+  const models=starters.map(entry=>energyModelCache.get(entry.modelKey)).filter(Boolean);
+  const missing=[...new Set(models.flatMap(model=>model.missingSources||[]))];
+  const coverage=missing.length?`Partial real-match model · ${missing.join(', ')} unavailable`:`Pooled real-match model ready · ${ENERGY_MODEL_SOURCES.length} datasets`;
+  return`${coverage} · ±3 energy · OVR/PHY −5/+5 · retry −10/+5 · exact retirement`;
+}
+
 function loadEnergyModels(starters){
   const profiles=new Map();
   const now=Date.now();
-  starters.forEach(entry=>{if(entry.profile&&entry.modelKey&&!energyModelCache.has(entry.modelKey)&&now-Number(energyModelFailures.get(entry.modelKey)||0)>60000)profiles.set(entry.modelKey,{key:entry.modelKey,...entry.profile});});
+  starters.forEach(entry=>{if(entry.profile&&entry.modelKey&&!energyModelCache.get(entry.modelKey)?.complete&&now-Number(energyModelFailures.get(entry.modelKey)||0)>ENERGY_MODEL_RETRY_MS)profiles.set(entry.modelKey,{key:entry.modelKey,...entry.profile});});
   if(!profiles.size){
-    if(starters.some(entry=>entry.modelKey)&&starters.every(entry=>!entry.modelKey||energyModelCache.has(entry.modelKey)))energyModelMessage='Real-match model ready · ±3 energy · OVR/PHY −5/+5 · retry −10/+5 · exact retirement';
+    if(starters.some(entry=>entry.modelKey)&&starters.every(entry=>!entry.modelKey||energyModelCache.has(entry.modelKey)))energyModelMessage=energyModelsReadyMessage(starters);
     return;
   }
   const requestKey=[...profiles.keys()].sort().join('~');
   if(energyModelRequests.has(requestKey))return;
   energyModelRequests.add(requestKey);
   energyModelMessage=`Loading evidence for ${profiles.size} player profile${profiles.size===1?'':'s'}…`;
-  fetch(ENERGY_MODEL_API,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({profiles:[...profiles.values()]})
-  }).then(response=>{
-    if(!response.ok)throw new Error(`Energy model returned ${response.status}`);
-    return response.json();
-  }).then(payload=>{
-    (payload.models||[]).forEach(model=>{energyModelCache.set(model.key,model);energyModelFailures.delete(model.key);});
-    energyModelMessage='Real-match model ready · ±3 energy · OVR/PHY −5/+5 · retry −10/+5 · exact retirement';
+  fetchPooledEnergyModels([...profiles.values()]).then(payload=>{
+    payload.models.forEach(cacheEnergyModel);
+    energyModelMessage=energyModelsReadyMessage(starters);
   }).catch(error=>{
     profiles.forEach((_,key)=>energyModelFailures.set(key,Date.now()));
     energyModelMessage='Real-match model unavailable · using retirement-based fallback drains';
@@ -2975,7 +3031,7 @@ function energyPoolProfiles(){
 
 function energyModelsPending(starters){
   const now=Date.now();
-  return starters.some(entry=>entry.modelKey&&!energyModelCache.has(entry.modelKey)&&now-Number(energyModelFailures.get(entry.modelKey)||0)>60000);
+  return starters.some(entry=>entry.modelKey&&!energyModelCache.has(entry.modelKey)&&now-Number(energyModelFailures.get(entry.modelKey)||0)>ENERGY_MODEL_RETRY_MS);
 }
 
 function modelPredictionFromEnergyModel(starter,model,energyRaw){
@@ -3076,7 +3132,7 @@ function updatePitchEnergyWarnings(starters,projection){
   let cacheChanged=false;
   const countBucket=energyProjectionCounts[energyLimitedSchedule?'limited':'full'];
   starters.forEach(entry=>{
-    if(entry.manualDrain||!entry.modelKey||!energyModelCache.has(entry.modelKey))return;
+    if(entry.manualDrain||!entry.modelKey||!energyModelCache.get(entry.modelKey)?.complete)return;
     const count=lowStarts.get(entry.index)||0;
     if(Number(countBucket[entry.modelKey])!==count){countBucket[entry.modelKey]=count;cacheChanged=true;}
   });
