@@ -26,6 +26,9 @@ function harness() {
     functionSource('squadCompletionStage'),
     functionSource('advanceSquadCompletionStage'),
     functionSource('divisionClubCounts'),
+    functionSource('divisionCountEntries'),
+    functionSource('normalizeCollapsedDivisions'),
+    functionSource('toggleDivisionGroup'),
   ].join('\n'), context);
   return context;
 }
@@ -60,8 +63,44 @@ test('division club counters include every division and normalize invalid values
   assert.equal(Object.keys(counts).length, 10);
 });
 
+test('header counter entries omit divisions with no clubs', () => {
+  const context = harness();
+  const entries = context.divisionCountEntries([
+    { division: 1 }, { division: 1 }, { division: 4 }, { division: 10 },
+  ]);
+  assert.equal(entries.length, 3);
+  assert.deepEqual(Array.from(entries, entry => entry.division), [1, 4, 10]);
+  assert.deepEqual(Array.from(entries, entry => entry.count), [2, 1, 1]);
+});
+
+test('collapsed division state accepts only valid division values', () => {
+  const context = harness();
+  const collapsed = context.normalizeCollapsedDivisions([1, '4', 10, 0, 11, 'bad', 4]);
+  assert.deepEqual([...collapsed], [1, 4, 10]);
+  assert.equal(context.normalizeCollapsedDivisions(null).size, 0);
+});
+
+test('division toggles collapse, expand, rerender and persist once per click', () => {
+  const context = harness();
+  vm.runInContext(`
+    let collapsedDivisions=new Set(),renders=0,saves=0;
+    function renderSquadList(){renders++;}
+    function autoSave(){saves++;}
+  `, context);
+  context.toggleDivisionGroup(4);
+  assert.deepEqual(Array.from(vm.runInContext('collapsedDivisions', context)), [4]);
+  context.toggleDivisionGroup(4);
+  assert.deepEqual(Array.from(vm.runInContext('collapsedDivisions', context)), []);
+  assert.equal(vm.runInContext('renders', context), 2);
+  assert.equal(vm.runInContext('saves', context), 2);
+});
+
 test('club list includes grouped counter and both visual status treatments', () => {
+  assert.match(html, /id="headerDivisionCounts"/);
+  assert.match(html, /class="header-division-count"/);
   assert.match(html, /class="division-list-count"/);
+  assert.match(html, /class="division-list-toggle" aria-expanded=/);
+  assert.match(html, /className='division-list-group'/);
   assert.match(html, /\.squad-list-item\.in-progress/);
   assert.match(html, /data-stage="\$\{stageName\}"/);
   assert.match(html, /aria-pressed="\$\{pressed\}"/);
