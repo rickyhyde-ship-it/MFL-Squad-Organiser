@@ -2130,12 +2130,15 @@ button.substitute-card:not(.is-filled):focus-visible {
 .energy-table th:first-child,
 .energy-table td:first-child { position: sticky; left: 0; z-index: 3; min-width: 54px; background: #111820; }
 .energy-table th:nth-child(2),
-.energy-table td:nth-child(2) { position: sticky; left: 54px; z-index: 3; min-width: 132px; background: #111820; text-align: left; }
+.energy-table td:nth-child(2) { position: sticky; left: 54px; z-index: 3; min-width: 178px; background: #111820; text-align: left; }
 .energy-table thead th:first-child,
 .energy-table thead th:nth-child(2) { z-index: 6; background: #151d28; }
 .energy-table tbody tr:hover td { background-color: rgba(168, 85, 247, .055); }
+.energy-table tbody tr:hover td:nth-child(2) { background-color: #191a28; }
 .energy-day { color: var(--text-primary); font: 700 10px 'JetBrains Mono', monospace; }
-.energy-events { display: flex; flex-wrap: wrap; gap: 3px; }
+.energy-events { display: grid; justify-items: start; gap: 4px; }
+.energy-event-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 6px; }
+.energy-team-rest-toggle { min-width: 80px; white-space: nowrap; }
 .energy-event {
   padding: 2px 4px;
   border: 1px solid var(--border);
@@ -2146,8 +2149,19 @@ button.substitute-card:not(.is-filled):focus-visible {
 }
 .energy-event.training { border-color: rgba(58, 242, 75, .24); color: #8ef299; }
 .energy-event.match { border-color: rgba(168, 85, 247, .34); color: #caa7ff; }
+.energy-cell { min-width: 114px; }
 .energy-cell strong { display: block; color: #b8f7c0; font: 700 11px 'JetBrains Mono', monospace; }
-.energy-cell strong.energy-match-values { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 7px; }
+.energy-match-values { display: grid; gap: 4px; }
+.energy-match-option { display: grid; grid-template-columns: max-content 44px; align-items: center; justify-content: center; gap: 3px 6px; }
+.energy-cell strong.energy-match-value { display: inline-flex; }
+.energy-table .energy-rest-toggle { min-height: 24px !important; padding: 3px 6px; border: 1px solid rgba(168, 85, 247, .4); border-radius: 4px !important; background: rgba(168, 85, 247, .06); color: #caa7ff; font: 600 8px 'JetBrains Mono', monospace; cursor: pointer; }
+.energy-rest-toggle:hover:not(:disabled) { background: rgba(168, 85, 247, .2); border-color: #caa7ff; }
+.energy-rest-toggle:focus-visible { outline: 2px solid #caa7ff; outline-offset: 2px; }
+.energy-rest-toggle[aria-pressed="true"] { color: #e0ccff; border-color: #b88bef; background: rgba(168, 85, 247, .23); }
+.energy-team-rest-toggle[aria-pressed="mixed"] { border-style: dashed; }
+.energy-rest-toggle:disabled { cursor: default; }
+.energy-cell small.energy-rest-recovery { grid-column: 1 / -1; margin: 0; color: #d4b5ff; font-size: 8px; }
+.energy-cell .energy-match-value.is-resting { color: #d4b5ff; }
 .energy-match-value { display: inline-flex; align-items: baseline; white-space: nowrap; }
 .energy-match-value + .energy-match-value { padding-left: 7px; border-left: 1px solid rgba(147, 164, 184, .28); }
 .energy-match-value em { margin-right: 3px; color: var(--text-muted); font: 700 7px 'JetBrains Mono', monospace; font-style: normal; }
@@ -2160,6 +2174,10 @@ button.substitute-card:not(.is-filled):focus-visible {
 .energy-match-status { min-width: 105px; text-align: left !important; color: #9ee8ad; font: 600 8px 'JetBrains Mono', monospace; }
 .energy-match-status.is-warning { background: rgba(255, 68, 68, .12); color: #ff7777; }
 .energy-match-status span { display: block; white-space: nowrap; }
+
+@media (pointer: coarse), (max-width: 560px) {
+  .energy-table .energy-rest-toggle { min-height: 44px !important; }
+}
 
 @media (max-width: 900px) {
   .energy-planner-header { flex-direction: column; gap: 12px; }
@@ -2315,7 +2333,7 @@ button.substitute-card:not(.is-filled):focus-visible {
               <div class="energy-starter-controls" id="energyStarterControls"></div>
             </div>
             <div class="energy-table-heading">
-              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Shows the energy at the start of each match, calculated in raw MFL units and rounded up for display.</span></div>
+              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Match-start energy, rounded up for display. Use Rest team or individual Rest buttons to recover 65% of missing energy. Choose G1 and G2 separately; G1 recovery carries into G2.</span></div>
               <div class="energy-legend"><span><i class="energy-dot safe"></i>&gt; 60%</span><span><i class="energy-dot danger"></i>60% or less</span><span><i class="energy-dot fallback"></i>Fallback used</span></div>
             </div>
             <div class="energy-table-shell" tabindex="0" aria-label="Scrollable daily starter energy table">
@@ -2398,6 +2416,7 @@ const ENERGY_DEFAULT_DRAIN=4;
 const ENERGY_MAX_RAW=10000;
 const ENERGY_FLOOR_RAW=1500;
 const ENERGY_LOW_RAW=6000;
+const ENERGY_REST_RECOVERY=0.65;
 const ENERGY_MATCH_TOLERANCE_RAW=300;
 const ENERGY_POOL_BATCH_SIZE=11;
 // These completed collection windows do not overlap, so their sample counts can be pooled.
@@ -2894,7 +2913,8 @@ function energyDrainFor(squad,slot,index,player=playerForSlot(slot)){
 function getEnergyStarters(squad){
   return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>{
     const profile=energyProfileFor(entry);
-    return{...entry,key:energyPlayerKey(entry.slot,entry.index),drain:energyDrainFor(squad,entry.slot,entry.index,entry.player),manualDrain:hasEnergyDrainOverride(squad,entry.slot,entry.index),profile,modelKey:profile?energyModelKey(profile):null};
+    const key=energyPlayerKey(entry.slot,entry.index);
+    return{...entry,key,restMatches:squad.energyRests?.[key]||{},drain:energyDrainFor(squad,entry.slot,entry.index,entry.player),manualDrain:hasEnergyDrainOverride(squad,entry.slot,entry.index),profile,modelKey:profile?energyModelKey(profile):null};
   });
 }
 
@@ -3094,20 +3114,27 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
     const start=energies.slice();
     if(scheduleDay.training)energies=energies.map(energy=>Math.round(energy+(ENERGY_MAX_RAW-energy)*0.2));
     const afterTraining=energies.slice();
-    const matchCount=Number(scheduleDay.league)+Number(scheduleDay.cup);
+    const matchTypes=['league','cup'].filter(type=>scheduleDay[type]);
     const matchStarts=[];
 
-    for(let matchIndex=0;matchIndex<matchCount;matchIndex++){
-      const tiredCount=energies.filter(energy=>energy<=ENERGY_LOW_RAW).length;
+    for(let matchIndex=0;matchIndex<matchTypes.length;matchIndex++){
+      const type=matchTypes[matchIndex];
+      const resting=starters.map(starter=>starter.restMatches?.[`${scheduleDay.day}:${type}`]===true);
+      const playingCount=resting.filter(rest=>!rest).length;
+      const tiredCount=energies.filter((energy,index)=>!resting[index]&&energy<=ENERGY_LOW_RAW).length;
       const blocked=tiredCount>=5;
       if(blocked){
         warningStarts+=1;
         if(!firstWarning)firstWarning={day:scheduleDay.day,match:matchIndex+1,tiredCount};
       }
       const matchEnergies=energies.slice();
-      const uses=energies.map((energy,index)=>energyUseFor(starters[index],energy));
-      matchStarts.push({match:matchIndex+1,tiredCount,blocked,energies:matchEnergies,uses});
-      energies=energies.map((energy,index)=>Math.max(ENERGY_FLOOR_RAW,energy-uses[index].drainRaw));
+      const uses=energies.map((energy,index)=>resting[index]
+        ?{source:'rest',drainRaw:0,recoveryRaw:Math.round((ENERGY_MAX_RAW-energy)*ENERGY_REST_RECOVERY)}
+        :energyUseFor(starters[index],energy));
+      energies=energies.map((energy,index)=>resting[index]
+        ?Math.min(ENERGY_MAX_RAW,energy+uses[index].recoveryRaw)
+        :Math.max(ENERGY_FLOOR_RAW,energy-uses[index].drainRaw));
+      matchStarts.push({match:matchIndex+1,type,resting,playingCount,tiredCount,blocked,energies:matchEnergies,uses,after:energies.slice()});
     }
 
     const end=energies.slice();
@@ -3125,14 +3152,16 @@ function updatePitchEnergyWarnings(starters,projection){
   if(!projection)return;
   const lowStarts=new Map(starters.map(entry=>[entry.index,0]));
   projection.rows.forEach(row=>row.matchStarts.forEach(match=>match.energies.forEach((energy,starterIndex)=>{
-    if(energy>ENERGY_LOW_RAW)return;
+    if(energy>ENERGY_LOW_RAW||match.resting?.[starterIndex])return;
     const starter=starters[starterIndex];
     if(starter)lowStarts.set(starter.index,(lowStarts.get(starter.index)||0)+1);
   })));
   let cacheChanged=false;
   const countBucket=energyProjectionCounts[energyLimitedSchedule?'limited':'full'];
-  starters.forEach(entry=>{
+  starters.forEach((entry,index)=>{
     if(entry.manualDrain||!entry.modelKey||!energyModelCache.get(entry.modelKey)?.complete)return;
+    // Saved pool counts describe playing every match, independently of squad rest choices.
+    if(projection.rows.some(row=>row.matchStarts.some(match=>match.resting?.[index])))return;
     const count=lowStarts.get(entry.index)||0;
     if(Number(countBucket[entry.modelKey])!==count){countBucket[entry.modelKey]=count;cacheChanged=true;}
   });
@@ -3172,6 +3201,40 @@ function clearEnergyDrainOverride(starterIndex){
   delete squad.energyDrains[energyPlayerKey(slot,starterIndex)];
   renderEnergyPlanner(true);
   autoSave();
+}
+
+function setEnergyRestForPlayer(squad,key,matchKey,resting){
+  squad.energyRests=squad.energyRests&&typeof squad.energyRests==='object'?squad.energyRests:{};
+  const rests=squad.energyRests[key]&&typeof squad.energyRests[key]==='object'?squad.energyRests[key]:{};
+  if(resting)rests[matchKey]=true;
+  else delete rests[matchKey];
+  if(Object.keys(rests).length)squad.energyRests[key]=rests;
+  else delete squad.energyRests[key];
+}
+
+function toggleEnergyRest(starterIndex,day,matchType){
+  if(viewerMode)return;
+  const squad=activeSquad(),slot=squad?.starters?.[starterIndex];
+  const scheduleDay=activeEnergySchedule().find(entry=>entry.day===day);
+  if(!squad||!slot||!['league','cup'].includes(matchType)||!scheduleDay?.[matchType])return;
+  const key=energyPlayerKey(slot,starterIndex),matchKey=`${day}:${matchType}`;
+  setEnergyRestForPlayer(squad,key,matchKey,squad.energyRests?.[key]?.[matchKey]!==true);
+  renderEnergyPlanner(false);
+  autoSave();
+  document.getElementById(`energy-rest-${starterIndex}-${day}-${matchType}`)?.focus({preventScroll:true});
+}
+
+function toggleEnergyTeamRest(day,matchType){
+  if(viewerMode)return;
+  const squad=activeSquad(),scheduleDay=activeEnergySchedule().find(entry=>entry.day===day);
+  if(!squad||!['league','cup'].includes(matchType)||!scheduleDay?.[matchType])return;
+  const starters=getEnergyStarters(squad),matchKey=`${day}:${matchType}`;
+  if(!starters.length)return;
+  const resting=!starters.every(entry=>entry.restMatches[matchKey]===true);
+  starters.forEach(entry=>setEnergyRestForPlayer(squad,entry.key,matchKey,resting));
+  renderEnergyPlanner(false);
+  autoSave();
+  document.getElementById(`energy-team-rest-${day}-${matchType}`)?.focus({preventScroll:true});
 }
 
 function renderEnergyPlanner(refreshControls=true){
@@ -3231,25 +3294,36 @@ function renderEnergyPlanner(refreshControls=true){
     const day=row.scheduleDay;
     const events=[];
     if(day.training)events.push('<span class="energy-event training">Train 08:00</span>');
-    if(day.league)events.push('<span class="energy-event match">League</span>');
-    if(day.cup)events.push('<span class="energy-event match">Cup</span>');
+    row.matchStarts.forEach(match=>{
+      const restCount=starters.length-match.playingCount;
+      const allResting=restCount===starters.length;
+      const pressed=allResting?'true':restCount?'mixed':'false';
+      const label=`Rest entire team on Day ${day.day}, G${match.match} (${match.type})`;
+      const title=`${restCount}/${starters.length} resting. ${allResting?'Click to play the entire team':'Click to rest the entire team'}. Individual players can be changed afterward.`;
+      events.push(`<div class="energy-event-row"><span class="energy-event match">G${match.match} ${match.type==='league'?'League':'Cup'}</span><button type="button" class="energy-rest-toggle energy-team-rest-toggle" id="energy-team-rest-${day.day}-${match.type}" aria-label="${escAttr(label)}" aria-pressed="${pressed}" title="${escAttr(title)}" onclick="toggleEnergyTeamRest(${day.day},'${match.type}')"${viewerMode?' disabled':''}>${allResting?'Team resting':'Rest team'}</button></div>`);
+    });
     if(!events.length)events.push('<span class="energy-event">No events</span>');
     const cells=row.end.map((energy,index)=>{
       const usesFallback=row.matchStarts.some(match=>match.uses[index].source==='fallback');
       const usesWidened=row.matchStarts.some(match=>match.uses[index].source==='widened');
-      const games=row.matchStarts.map(match=>`G${match.match} ${match.energies[index]} raw (${formatEnergy(match.energies[index])}) −${match.uses[index].drainRaw} raw${match.uses[index].source==='model'||match.uses[index].source==='widened'?` (${match.uses[index].sampleSize} samples${match.uses[index].source==='widened'?', widened':''})`:` (${match.uses[index].source})`}`);
-      const matchEnergyValues=row.matchStarts.map(match=>match.energies[index]);
+      const games=row.matchStarts.map(match=>match.resting[index]
+        ?`G${match.match} rest: ${match.energies[index]} raw +${match.uses[index].recoveryRaw} raw recovery → ${match.after[index]} raw`
+        :`G${match.match} ${match.energies[index]} raw (${formatEnergy(match.energies[index])}) −${match.uses[index].drainRaw} raw${match.uses[index].source==='model'||match.uses[index].source==='widened'?` (${match.uses[index].sampleSize} samples${match.uses[index].source==='widened'?', widened':''})`:` (${match.uses[index].source})`}`);
       const displayedValues=row.matchStarts.length
-        ?row.matchStarts.map(match=>`<span class="energy-match-value${match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}">${row.matchStarts.length>1?`<em>G${match.match}</em>`:''}${formatEnergy(match.energies[index])}</span>`).join('')
-        :`<span class="energy-match-value${row.afterTraining[index]<=ENERGY_LOW_RAW?' is-low':''}">${formatEnergy(row.afterTraining[index])}</span>`;
-      const startLabel=row.matchStarts.length?`${row.matchStarts.length>1?'match starts':'game start'} · ends ${formatEnergy(energy)}`:'after training';
+        ?row.matchStarts.map(match=>{
+          const resting=match.resting[index],entry=starters[index];
+          const label=`Rest ${entry.player.name} on Day ${day.day}, G${match.match} (${match.type})`;
+          return`<div class="energy-match-option"><strong class="energy-match-value${resting?' is-resting':match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}"><em>G${match.match}</em>${formatEnergy(match.energies[index])}</strong><button type="button" class="energy-rest-toggle" id="energy-rest-${entry.index}-${day.day}-${match.type}" aria-label="${escAttr(label)}" aria-pressed="${resting}" title="${resting?'Click to play this match':'Rest to recover 65% of missing energy'}" onclick="toggleEnergyRest(${entry.index},${day.day},'${match.type}')"${viewerMode?' disabled':''}>${resting?'Resting':'Rest'}</button>${resting?`<small class="energy-rest-recovery">Recovers to ${formatEnergy(match.after[index])}</small>`:''}</div>`;
+        }).join('')
+        :`<strong class="energy-match-value${row.afterTraining[index]<=ENERGY_LOW_RAW?' is-low':''}">${formatEnergy(row.afterTraining[index])}</strong>`;
+      const startLabel=row.matchStarts.length?`ends ${formatEnergy(energy)}`:'after training';
       const detail=games.length?games.join(' · '):'No match';
-      const hasLowStart=(matchEnergyValues.length?matchEnergyValues:[row.afterTraining[index]]).some(value=>value<=ENERGY_LOW_RAW);
-      return`<td class="energy-cell${hasLowStart?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><strong class="energy-match-values">${displayedValues}</strong><small>${startLabel}${usesFallback?' · FALLBACK':usesWidened?' · WIDENED':''}</small></td>`;
+      const hasLowStart=row.matchStarts.length?row.matchStarts.some(match=>!match.resting[index]&&match.energies[index]<=ENERGY_LOW_RAW):row.afterTraining[index]<=ENERGY_LOW_RAW;
+      return`<td class="energy-cell${hasLowStart?' is-low':''}${usesFallback?' is-fallback':''}" title="${escAttr(`Day ${day.day}: ${starters[index].player.name}. ${detail}. Ends ${energy} raw (${formatEnergy(energy)}).`)}"><div class="energy-match-values">${displayedValues}</div><small>${startLabel}${usesFallback?' · FALLBACK':usesWidened?' · WIDENED':''}</small></td>`;
     }).join('');
     const hasWarning=row.matchStarts.some(match=>match.blocked);
     const hasFallback=row.matchStarts.some(match=>match.uses.some(use=>use.source==='fallback'));
-    const matchStatus=row.matchStarts.length?row.matchStarts.map(match=>{const widenedCount=match.uses.filter(use=>use.source==='widened').length,fallbackCount=match.uses.filter(use=>use.source==='fallback').length;return`<span>G${match.match}: ${match.tiredCount}/${starters.length} ≤60%${match.blocked?' ⚠':''}${widenedCount?` · ${widenedCount} widened`:''}${fallbackCount?` · ${fallbackCount} fallback`:''}</span>`;}).join(''):'<span>No match</span>';
+    const matchStatus=row.matchStarts.length?row.matchStarts.map(match=>{const widenedCount=match.uses.filter(use=>use.source==='widened').length,fallbackCount=match.uses.filter(use=>use.source==='fallback').length,restCount=starters.length-match.playingCount;return`<span>G${match.match}: ${match.playingCount?`${match.tiredCount}/${match.playingCount} ≤60%`:'All resting'}${match.blocked?' ⚠':''}${restCount&&match.playingCount?` · ${restCount} resting`:''}${widenedCount?` · ${widenedCount} widened`:''}${fallbackCount?` · ${fallbackCount} fallback`:''}</span>`;}).join(''):'<span>No match</span>';
     return`<tr class="${hasFallback?'has-fallback':''}"><th scope="row" class="energy-day">D${day.day}</th><td><div class="energy-events">${events.join('')}</div></td>${cells}<td class="energy-match-status${hasWarning?' is-warning':''}">${matchStatus}</td></tr>`;
   }).join('');
   table.innerHTML=`<thead><tr><th scope="col">Day</th><th scope="col">Schedule</th>${playerHeaders}<th scope="col">Match starts</th></tr></thead><tbody>${body}</tbody>`;
@@ -3415,6 +3489,7 @@ function createSquadForClub(club) {
     substitutes: [],
     loans: [],
     energyDrains: {},
+    energyRests: {},
   };
 }
 
@@ -3668,7 +3743,7 @@ function renderPoolSummary(){
 
 function setClubSyncStatus(message,isError=false){const el=document.getElementById('clubSyncStatus');if(!el)return;el.textContent=message||'';el.style.color=isError?'var(--red)':'var(--text-muted)';}
 function showNoSquadMessage(message='Select or create a squad to get started'){activeSquadId=null;document.getElementById('squadContent').style.display='none';const empty=document.getElementById('noSquadMsg');empty.textContent=message;empty.style.display='flex';}
-function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),division:10,divisionManual:true,completed:false,startersFormation:'',backupsFormation:'',starters:[],backups:[],substitutes:[],loans:[],energyDrains:{}});sortSquads();renderSquadList();selectSquad(id);autoSave();}
+function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),division:10,divisionManual:true,completed:false,startersFormation:'',backupsFormation:'',starters:[],backups:[],substitutes:[],loans:[],energyDrains:{},energyRests:{}});sortSquads();renderSquadList();selectSquad(id);autoSave();}
 function deleteSquad(id){if(!confirm('Delete this club and its saved squad?'))return;squads=squads.filter(s=>s.id!==id);if(activeSquadId===id)showNoSquadMessage();renderSquadList();renderPoolSummary();autoSave();}
 function divisionOptions(selected){let options='';for(let division=1;division<=10;division++)options+=`<option value="${division}"${division===selected?' selected':''}>${DIVISION_NAMES[division]}</option>`;return options;}
 function changeSquadDivision(id,value){const squad=squads.find(item=>item.id===id);if(!squad)return;squad.division=normalizeDivision(value);squad.divisionManual=true;delete squad.sortOrder;sortSquads();renderSquadList();if(id===activeSquadId)updateSquadSizeCounter();autoSave();}
@@ -3699,7 +3774,7 @@ function renderSquadList(){
     d.addEventListener('click',()=>selectSquad(sq.id));c.appendChild(d);
   });
 }
-function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
+function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};sq.energyRests={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
 function deleteAllClubs(){if(!squads.length)return;if(!confirm(`Delete all ${squads.length} clubs and their saved squads?`))return;squads=[];clubsInitialized=true;showNoSquadMessage('No clubs saved. Use Update Clubs to restore your owned clubs.');renderSquadList();renderPoolSummary();setClubSyncStatus('All clubs deleted.');autoSave();}
 async function updateClubs(){const wallet=localStorage.getItem('mfl_last_wallet');if(!wallet){setClubSyncStatus('Load a wallet before updating clubs.',true);return;}const button=document.getElementById('updateClubsBtn');button.disabled=true;button.textContent='Updating…';setClubSyncStatus('Checking owned clubs…');try{const ownedClubs=await fetchOwnedClubs(wallet);const ownedIds=new Set(ownedClubs.map(club=>club.clubId));const removed=squads.filter(squad=>squad.isOwnedClub&&squad.clubId&&!ownedIds.has(String(squad.clubId)));if(removed.length&&!confirm(`Update Clubs will remove ${removed.length} club${removed.length===1?'':'s'} no longer owned by this wallet. Continue?`)){setClubSyncStatus('Club update cancelled.');return;}mergeOwnedClubs(ownedClubs,true);clubsInitialized=true;renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage(squads.length?'Select a club to build its squad.':'No MFL_OWNER clubs found for this wallet.');renderPoolSummary();autoSave();setClubSyncStatus(`${ownedClubs.length} owned club${ownedClubs.length===1?'':'s'} updated.`);}catch(error){setClubSyncStatus(error.message||'Clubs could not be updated.',true);}finally{button.disabled=false;button.textContent='Update Clubs';}}
 function selectSquad(id){activeSquadId=id;pendingCoverPlayerId=null;document.getElementById('noSquadMsg').style.display='none';document.getElementById('squadContent').style.display='block';const sq=squads.find(s=>s.id===id);if(!sq)return;sq.substitutes=Array.isArray(sq.substitutes)?sq.substitutes.slice(0,SUBSTITUTE_LIMIT):[];document.getElementById('squadNameInput').value=sq.name;document.getElementById('startersFormation').value=sq.startersFormation||'';document.getElementById('backupsFormation').value=sq.backupsFormation||'';updateNextSeasonToggle();renderPoolSummary();renderSquadList();renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();}

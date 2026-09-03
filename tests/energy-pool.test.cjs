@@ -190,3 +190,139 @@ test('planner retries a partial model after the cooldown and replaces it with po
   assert.equal(read(`energyModelCache.get('${profile.key}').complete`), true);
   assert.equal(read('renderCount'), 1);
 });
+
+test('rest restores 65% of missing raw energy instead of draining, including at full energy', () => {
+  const { context } = harness();
+  const schedule = [1, 2, 3].map(day => ({ day, training: false, league: true, cup: false }));
+  const projection = context.calculateEnergyProjection([
+    { drain: 4.11, manualDrain: true, restMatches: { '2:league': true } },
+    { drain: 20, manualDrain: true, restMatches: { '1:league': true } },
+  ], schedule);
+  const rest = projection.rows[1].matchStarts[0];
+  assert.equal(rest.energies[0], 9589);
+  assert.equal(rest.uses[0].source, 'rest');
+  assert.equal(rest.uses[0].drainRaw, 0);
+  assert.equal(rest.uses[0].recoveryRaw, 267);
+  assert.equal(rest.after[0], 9856);
+  assert.equal(projection.rows[2].matchStarts[0].energies[0], 9856);
+  assert.equal(projection.final[0], 9445);
+  assert.equal(projection.rows[0].end[1], 10000);
+});
+
+test('D7 and D9 support play/play, rest/play, play/rest and rest/rest in sequence', () => {
+  const { context } = harness();
+  const combinations = [
+    { league: false, cup: false, secondStart: 6400, end: 4400 },
+    { league: true, cup: false, secondStart: 9440, end: 7440 },
+    { league: false, cup: true, secondStart: 6400, end: 8740 },
+    { league: true, cup: true, secondStart: 9440, end: 9804 },
+  ];
+  for (const day of [7, 9]) {
+    for (const choice of combinations) {
+      const schedule = [
+        { day: 1, training: false, league: true, cup: false },
+        context.energyScheduleForMode(false).find(row => row.day === day),
+        { day: day + 1, training: true, league: true, cup: false },
+      ];
+      const rests = { [`${day}:league`]: choice.league, [`${day}:cup`]: choice.cup };
+      const projection = context.calculateEnergyProjection([
+        { drain: 20, manualDrain: true, restMatches: rests },
+        { drain: 20, manualDrain: true },
+      ], schedule);
+      const row = projection.rows[1];
+      assert.equal(row.afterTraining[0], 8400);
+      assert.equal(row.matchStarts[0].type, 'league');
+      assert.equal(row.matchStarts[1].type, 'cup');
+      assert.equal(row.matchStarts[0].energies[0], 8400);
+      assert.equal(row.matchStarts[1].energies[0], choice.secondStart);
+      assert.equal(row.end[0], choice.end);
+      assert.equal(row.end[1], 4400, 'resting one player does not change another player');
+      assert.equal(projection.rows[2].matchStarts[0].energies[0], Math.round(choice.end + (10000 - choice.end) * 0.2));
+    }
+  }
+});
+
+test('resting at the energy floor recovers energy and removes that appearance from warnings', () => {
+  const { context, read } = harness();
+  const schedule = Array.from({ length: 6 }, (_, index) => ({ day: index + 1, training: false, league: true, cup: false }));
+  const starters = Array.from({ length: 5 }, (_, index) => ({
+    index, drain: 20, modelKey: profile.key, manualDrain: true,
+    player: { name: `Player ${index}` }, restMatches: index === 0 ? { '6:league': true } : {},
+  }));
+  const projection = context.calculateEnergyProjection(starters, schedule);
+  const match = projection.rows[5].matchStarts[0];
+  assert.equal(match.energies[0], 1500);
+  assert.equal(match.after[0], 7025);
+  assert.equal(match.playingCount, 4);
+  assert.equal(match.tiredCount, 4);
+  assert.equal(match.blocked, false);
+  const badges = new Map();
+  context.document = {
+    getElementById: () => ({ querySelectorAll: () => [], querySelector: selector => ({ appendChild: badge => badges.set(selector, badge.textContent) }) }),
+    createElement: () => ({ setAttribute() {} }),
+  };
+  context.updatePitchEnergyWarnings(starters, projection);
+  assert.equal(badges.get('.pitch-slot[data-idx="0"] .pitch-slot-ovr-alerts'), '3');
+  assert.equal(badges.get('.pitch-slot[data-idx="1"] .pitch-slot-ovr-alerts'), '4');
+
+  // A custom rest plan must never replace the pool's all-matches count.
+  context.cacheEnergyModel({ ...model([]), complete: true, missingSources: [] });
+  read(`energyProjectionCounts.full['${profile.key}']=77;`);
+  starters[0].manualDrain = false;
+  context.updatePitchEnergyWarnings(starters, projection);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false), 77);
+});
+
+test('cup rests remain tied to the cup on cup-only days and across schedule modes', () => {
+  const { context } = harness();
+  const starter = { drain: 20, manualDrain: true, restMatches: { '6:cup': true, '7:cup': true, '16:cup': true } };
+  for (const limited of [false, true]) {
+    const projection = context.calculateEnergyProjection([starter], context.energyScheduleForMode(limited));
+    const cupOnly = projection.rows.find(row => row.scheduleDay.day === 6).matchStarts[0];
+    assert.equal(cupOnly.match, 1);
+    assert.equal(cupOnly.type, 'cup');
+    assert.equal(cupOnly.resting[0], true);
+    const double = projection.rows.find(row => row.scheduleDay.day === 7).matchStarts;
+    assert.equal(double[0].resting[0], false);
+    assert.equal(double[1].resting[0], true);
+  }
+});
+
+test('team rest updates every visible starter, allows individual overrides, and preserves other matches', () => {
+  const { context, read } = harness();
+  read(`
+    let viewerMode=false,saveCount=0;
+    const squad={starters:[{playerId:1},{playerId:2},null,{playerId:3}]};
+    function activeSquad(){return squad;}
+    function playerForSlot(slot){return slot?{name:'Player '+slot.playerId}:null;}
+    function isSlotIgnoredNextSeason(){return false;}
+    function energyProfileFor(){return null;}
+    function energyDrainFor(){return 4;}
+    function hasEnergyDrainOverride(){return true;}
+    function autoSave(){saveCount++;localStorage.setItem('squad',JSON.stringify(squad));}
+    const document={getElementById:()=>({focus(){}})};
+    ${['slotPlayerKey','energyPlayerKey','getEnergyStarters','setEnergyRestForPlayer','toggleEnergyRest','toggleEnergyTeamRest'].map(functionSource).join('\n')}
+  `);
+  context.toggleEnergyRest(0, 9, 'cup');
+  context.toggleEnergyTeamRest(7, 'league');
+  assert.equal(read('saveCount'), 2, 'team toggle saves the batch once');
+  assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:league']===true)`), true);
+  context.toggleEnergyRest(1, 7, 'league');
+  assert.equal(read(`getEnergyStarters(squad).filter(entry=>entry.restMatches['7:league']).length`), 2);
+  context.toggleEnergyTeamRest(7, 'cup');
+  assert.equal(read(`getEnergyStarters(squad).filter(entry=>entry.restMatches['7:league']).length`), 2);
+  assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:cup']===true)`), true);
+  context.toggleEnergyTeamRest(7, 'league');
+  assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:league']===true)`), true);
+  context.toggleEnergyTeamRest(7, 'league');
+  assert.equal(read(`getEnergyStarters(squad).some(entry=>entry.restMatches['7:league'])`), false);
+  assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:cup']===true)`), true);
+  assert.equal(read(`JSON.parse(localStorage.getItem('squad')).energyRests['player:1']['9:cup']`), true);
+  const savedCount = read('saveCount');
+  context.toggleEnergyTeamRest(1, 'cup'); // No cup is scheduled.
+  read('viewerMode=true;');
+  context.toggleEnergyTeamRest(7, 'cup');
+  context.toggleEnergyRest(0, 7, 'cup');
+  assert.equal(read('saveCount'), savedCount);
+  assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:cup']===true)`), true);
+});
