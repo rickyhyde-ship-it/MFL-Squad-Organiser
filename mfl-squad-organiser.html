@@ -2171,14 +2171,14 @@ button.substitute-card:not(.is-filled):focus-visible {
 
 .energy-starter-controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 7px;
   margin-top: 8px;
 }
 
 .energy-player-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -2217,7 +2217,87 @@ button.substitute-card:not(.is-filled):focus-visible {
   white-space: nowrap;
 }
 
+.energy-player-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.energy-player-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: 1px solid rgba(151,178,199,.17);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font: 700 7px/1 'JetBrains Mono', monospace;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.energy-player-meta-item strong {
+  color: var(--text-primary);
+  font-size: 8px;
+}
+
+.energy-player-meta-item.is-retirement[data-level="yellow"] { border-color: rgba(255,204,0,.42); color: #ffdb4d; }
+.energy-player-meta-item.is-retirement[data-level="orange"] { border-color: rgba(255,153,0,.48); color: #ffad33; }
+.energy-player-meta-item.is-retirement[data-level="red"] { border-color: rgba(248,113,113,.52); color: #fca5a5; }
+
+.energy-player-training {
+  display: grid;
+  gap: 3px;
+}
+
+.energy-player-training-label {
+  color: var(--text-muted);
+  font: 700 7px/1 'JetBrains Mono', monospace;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.energy-player-training-options {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(151,178,199,.17);
+  border-radius: 5px;
+  background: rgba(2,7,13,.45);
+}
+
+.energy-player-training-option {
+  min-width: 29px;
+  min-height: 25px;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 8px/1 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+
+.energy-player-training-option:hover,
+.energy-player-training-option:focus-visible {
+  border-color: rgba(192,132,252,.42);
+  color: #e9d5ff;
+  outline: none;
+}
+
+.energy-player-training-option:focus-visible { box-shadow: 0 0 0 2px rgba(192,132,252,.4); }
+.energy-player-training-option[aria-pressed="true"] { border-color: rgba(72,245,154,.5); background: rgba(72,245,154,.1); color: #a8f5cd; }
+
 .energy-drain-field { display: flex; align-items: center; gap: 4px; }
+
+@media (max-width: 520px) {
+  .energy-starter-controls { grid-template-columns: 1fr; }
+  .energy-player-control { grid-template-columns: minmax(0, 1fr) auto; }
+  .energy-player-training { grid-column: 1 / -1; grid-row: 2; }
+  .energy-player-training-options { width: max-content; }
+}
 
 .energy-drain-input {
   width: 58px;
@@ -2480,7 +2560,7 @@ button.substitute-card:not(.is-filled):focus-visible {
                 <span class="energy-toggle-copy"><strong>28-game schedule</strong><small>First 6 cups · no league D31–33</small></span>
               </button>
               <div class="energy-training-control" role="group" aria-labelledby="energyTrainingLabel" aria-describedby="energyTrainingDescription">
-                <span class="energy-training-label" id="energyTrainingLabel">Training intensity</span>
+                <span class="energy-training-label" id="energyTrainingLabel">Team training intensity</span>
                 <div class="energy-training-options">
                   <button type="button" class="energy-training-option" data-intensity="low" aria-pressed="true" onclick="setEnergyTrainingIntensity('low')" title="Gain 20% of missing energy">Low</button>
                   <button type="button" class="energy-training-option" data-intensity="medium" aria-pressed="false" onclick="setEnergyTrainingIntensity('medium')" title="No energy gained or lost">Medium</button>
@@ -2671,7 +2751,10 @@ function energyAfterTraining(energy,intensity=energyTrainingIntensity){
 function setEnergyTrainingIntensity(value){
   energyTrainingIntensity=normalizeEnergyTrainingIntensity(value);
   localStorage.setItem('mfl_energy_training_intensity',energyTrainingIntensity);
-  renderEnergyPlanner(false);
+  const squad=typeof activeSquad==='function'?activeSquad():null;
+  if(squad)squad.energyTrainingIntensities={};
+  renderEnergyPlanner(true);
+  if(squad&&typeof autoSave==='function')autoSave();
   if(document.getElementById('addPlayerModal')?.classList.contains('open'))applyFilters();
 }
 const DIVISION_MIN_OVR={1:88,2:85,3:82,4:78,5:74,6:70,7:65,8:56,9:46,10:null};
@@ -3082,6 +3165,24 @@ function energyPlayerKey(slot,index){
   return`loan:${String(slot?.name||'player').toLowerCase()}:${index}`;
 }
 
+function energyTrainingIntensityFor(squad,slot,index){
+  const key=energyPlayerKey(slot,index),saved=squad?.energyTrainingIntensities?.[key];
+  return ENERGY_TRAINING_MODES.includes(saved)?saved:energyTrainingIntensity;
+}
+
+function setPlayerEnergyTrainingIntensity(starterIndex,value){
+  if(viewerMode)return;
+  const squad=activeSquad(),slot=squad?.starters?.[starterIndex];
+  if(!squad||!slot)return;
+  const intensity=normalizeEnergyTrainingIntensity(value),key=energyPlayerKey(slot,starterIndex);
+  squad.energyTrainingIntensities=squad.energyTrainingIntensities&&typeof squad.energyTrainingIntensities==='object'?squad.energyTrainingIntensities:{};
+  if(intensity===energyTrainingIntensity)delete squad.energyTrainingIntensities[key];
+  else squad.energyTrainingIntensities[key]=intensity;
+  renderEnergyPlanner(true);
+  autoSave();
+  document.querySelector(`.energy-player-training-option[data-starter-index="${starterIndex}"][data-intensity="${intensity}"]`)?.focus({preventScroll:true});
+}
+
 function normalizeEnergyDrain(value){
   const numeric=Number(value);
   if(!Number.isFinite(numeric))return ENERGY_DEFAULT_DRAIN;
@@ -3110,7 +3211,7 @@ function getEnergyStarters(squad){
   return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>{
     const profile=energyProfileFor(entry);
     const key=energyPlayerKey(entry.slot,entry.index);
-    return{...entry,key,restMatches:squad.energyRests?.[key]||{},drain:energyDrainFor(squad,entry.slot,entry.index,entry.player),manualDrain:hasEnergyDrainOverride(squad,entry.slot,entry.index),profile,modelKey:profile?energyModelKey(profile):null};
+    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:energyDrainFor(squad,entry.slot,entry.index,entry.player),manualDrain:hasEnergyDrainOverride(squad,entry.slot,entry.index),profile,modelKey:profile?energyModelKey(profile):null};
   });
 }
 
@@ -3308,7 +3409,7 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule(),inte
 
   schedule.forEach(scheduleDay=>{
     const start=energies.slice();
-    if(scheduleDay.training)energies=energies.map(energy=>energyAfterTraining(energy,intensity));
+    if(scheduleDay.training)energies=energies.map((energy,index)=>energyAfterTraining(energy,starters[index]?.trainingIntensity||intensity));
     const afterTraining=energies.slice();
     const matchTypes=['league','cup'].filter(type=>scheduleDay[type]);
     const matchStarts=[];
@@ -3359,7 +3460,7 @@ function updatePitchEnergyWarnings(starters,projection){
     // Saved pool counts describe playing every match, independently of squad rest choices.
     if(projection.rows.some(row=>row.matchStarts.some(match=>match.resting?.[index])))return;
     const count=lowStarts.get(entry.index)||0;
-    const key=energyProjectionCountKey(entry.modelKey);
+    const key=energyProjectionCountKey(entry.modelKey,entry.trainingIntensity||energyTrainingIntensity);
     if(Number(countBucket[key])!==count){countBucket[key]=count;cacheChanged=true;}
   });
   if(cacheChanged)saveEnergyProjectionCounts();
@@ -3434,6 +3535,35 @@ function toggleEnergyTeamRest(day,matchType){
   document.getElementById(`energy-team-rest-${day}-${matchType}`)?.focus({preventScroll:true});
 }
 
+function energyPlayerRetirementMeta(player){
+  const years=projectedRetirementYears(player?.retireIn);
+  if(!Number.isInteger(years)||years<0||years>3)return'';
+  const level=years<=1?'red':years===2?'orange':'yellow';
+  const label=years===0?'Retiring':`Retires ${years}S`;
+  const title=years===0?'Retiring this season':`Retirement notice: ${years} season${years===1?'':'s'} remaining`;
+  return`<span class="energy-player-meta-item is-retirement" data-level="${level}" title="${title}">${label}</span>`;
+}
+
+function renderEnergyPlayerMeta(player){
+  const overall=player?.ovr===null||player?.ovr===undefined||player?.ovr===''?NaN:Number(player.ovr);
+  const age=player?.age===null||player?.age===undefined||player?.age===''?NaN:Number(player.age);
+  const overallLabel=Number.isFinite(overall)?Math.round(overall):'—';
+  const ageLabel=Number.isFinite(age)&&age>0?Math.round(age):'—';
+  const overallColor=Number.isFinite(overall)?getOvrColor(overall):'var(--text-muted)';
+  return`<span class="energy-player-meta"><span class="energy-player-meta-item">OVR <strong style="color:${overallColor}">${overallLabel}</strong></span><span class="energy-player-meta-item">Age <strong>${ageLabel}</strong></span>${energyPlayerRetirementMeta(player)}</span>`;
+}
+
+function renderEnergyPlayerTrainingOptions(entry){
+  const active=ENERGY_TRAINING_MODES.includes(entry.trainingIntensity)?entry.trainingIntensity:energyTrainingIntensity;
+  const labels={low:'Low',medium:'Medium',high:'High'};
+  const buttons=ENERGY_TRAINING_MODES.map(intensity=>`<button type="button" class="energy-player-training-option" data-starter-index="${entry.index}" data-intensity="${intensity}" aria-pressed="${intensity===active}" onclick="setPlayerEnergyTrainingIntensity(${entry.index},'${intensity}')" title="${escAttr(ENERGY_TRAINING_DESCRIPTIONS[intensity])}"${viewerMode?' disabled':''}>${labels[intensity]}</button>`).join('');
+  return`<span class="energy-player-training" role="group" aria-label="Training intensity for ${escAttr(entry.player.name)}"><span class="energy-player-training-label">Training</span><span class="energy-player-training-options">${buttons}</span></span>`;
+}
+
+function renderEnergyPlayerIdentity(entry,source){
+  return`<span class="energy-player-identity"><span class="energy-player-pos">${escHtml(entry.slot.slotPos||'XI')}</span><span class="energy-player-name" title="${escAttr(entry.player.name)}">${escHtml(entry.player.name)}</span>${renderEnergyPlayerMeta(entry.player)}<span class="energy-player-model">${escHtml(source)}</span></span>`;
+}
+
 function renderEnergyPlanner(refreshControls=true){
   const empty=document.getElementById('energyPlannerEmpty'),content=document.getElementById('energyPlannerContent'),summary=document.getElementById('energySummary'),controls=document.getElementById('energyStarterControls'),table=document.getElementById('energyTable'),modelStatus=document.getElementById('energyModelStatus');
   if(!empty||!content||!summary||!controls||!table)return;
@@ -3447,6 +3577,8 @@ function renderEnergyPlanner(refreshControls=true){
   if(trainingDescription)trainingDescription.textContent=ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity];
   const squad=activeSquad();
   const starters=getEnergyStarters(squad);
+  const hasIndividualTraining=starters.some(entry=>entry.trainingIntensity!==energyTrainingIntensity);
+  if(trainingDescription)trainingDescription.textContent=`${ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity]}${hasIndividualTraining?' Individual player settings override the team selection where shown.':''}`;
   if(!squad||!starters.length){
     updatePitchEnergyWarnings([],null);
     empty.hidden=false;
@@ -3461,7 +3593,7 @@ function renderEnergyPlanner(refreshControls=true){
   if(energyModelsPending(starters)){
     updatePitchEnergyWarnings(starters,null);
     summary.innerHTML=`<div class="energy-summary-card"><span class="energy-summary-label">Historic evidence</span><span class="energy-summary-value">Loading…</span><span class="energy-summary-detail">The projection will start only after matching data is checked.</span></div>`;
-    if(refreshControls)controls.innerHTML=starters.map(entry=>`<div class="energy-player-control"><span class="energy-player-identity"><span class="energy-player-pos">${escHtml(entry.slot.slotPos||'XI')}</span><span class="energy-player-name">${escHtml(entry.player.name)}</span><span class="energy-player-model">Checking exact historic matches…</span></span></div>`).join('');
+    if(refreshControls)controls.innerHTML=starters.map(entry=>`<div class="energy-player-control">${renderEnergyPlayerIdentity(entry,'Checking exact historic matches…')}${renderEnergyPlayerTrainingOptions(entry)}</div>`).join('');
     table.innerHTML='<tbody><tr><td style="padding:24px;text-align:center;color:var(--text-muted)">Loading raw historic energy observations…</td></tr></tbody>';
     return;
   }
@@ -3481,19 +3613,21 @@ function renderEnergyPlanner(refreshControls=true){
 
   if(refreshControls){
     controls.innerHTML=starters.map(entry=>{
-      const position=entry.slot.slotPos||'XI';
       const prediction=modelPredictionFor(entry,ENERGY_MAX_RAW),displayDrain=entry.manualDrain?entry.drain:prediction?prediction.drainRaw/100:entry.drain;
       const fallback=!entry.manualDrain&&!prediction;
       const source=entry.manualDrain?'Manual fixed drain':prediction?`${prediction.tier==='widened'?'Widened model −10/+5':'Historic model −5/+5'} · ${prediction.sampleSize.toLocaleString()} matches within ±300 raw`:entry.modelKey&&energyModelCache.has(entry.modelKey)?'FALLBACK · no historic match after −10/+5 retry':'FALLBACK · player profile unavailable';
-      return`<div class="energy-player-control${fallback?' is-fallback':''}"><span class="energy-player-identity"><span class="energy-player-pos">${escHtml(position)}</span><span class="energy-player-name" title="${escAttr(entry.player.name)}">${escHtml(entry.player.name)}</span><span class="energy-player-model">${escHtml(source)}</span></span><span class="energy-drain-field"><input class="energy-drain-input" type="number" min="0" max="20" step="0.1" inputmode="decimal" value="${displayDrain.toFixed(1)}" title="Edit to use a fixed manual drain" aria-label="Energy drain per match for ${escAttr(entry.player.name)}" onchange="updateEnergyDrain(${entry.index},this.value)"${viewerMode?' disabled':''}>${entry.manualDrain&&!viewerMode?`<button type="button" class="energy-use-model" onclick="clearEnergyDrainOverride(${entry.index})" title="Return to the real-match model">AUTO</button>`:''}</span></div>`;
+      return`<div class="energy-player-control${fallback?' is-fallback':''}">${renderEnergyPlayerIdentity(entry,source)}${renderEnergyPlayerTrainingOptions(entry)}<span class="energy-drain-field"><input class="energy-drain-input" type="number" min="0" max="20" step="0.1" inputmode="decimal" value="${displayDrain.toFixed(1)}" title="Edit to use a fixed manual drain" aria-label="Energy drain per match for ${escAttr(entry.player.name)}" onchange="updateEnergyDrain(${entry.index},this.value)"${viewerMode?' disabled':''}>${entry.manualDrain&&!viewerMode?`<button type="button" class="energy-use-model" onclick="clearEnergyDrainOverride(${entry.index})" title="Return to the real-match model">AUTO</button>`:''}</span></div>`;
     }).join('');
   }
 
   const playerHeaders=starters.map(entry=>`<th scope="col" title="${escAttr(entry.player.name)}">${escHtml(entry.player.name.split(' ').pop())}</th>`).join('');
+  const trainingModes=[...new Set(starters.map(entry=>entry.trainingIntensity||energyTrainingIntensity))];
+  const trainingEventIntensity=trainingModes.length===1?trainingModes[0]:'mixed';
+  const trainingEventDescription=trainingModes.length===1?ENERGY_TRAINING_DESCRIPTIONS[trainingModes[0]]:'Players use their individually selected training intensities.';
   const body=projection.rows.map(row=>{
     const day=row.scheduleDay;
     const events=[];
-    if(day.training)events.push(`<span class="energy-event training" title="${escAttr(ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity])}">${energyTrainingIntensity} 08:00</span>`);
+    if(day.training)events.push(`<span class="energy-event training" title="${escAttr(trainingEventDescription)}">${trainingEventIntensity} 08:00</span>`);
     row.matchStarts.forEach(match=>{
       const restCount=starters.length-match.playingCount;
       const allResting=restCount===starters.length;
@@ -3691,6 +3825,7 @@ function createSquadForClub(club) {
     loans: [],
     energyDrains: {},
     energyRests: {},
+    energyTrainingIntensities: {},
   };
 }
 
@@ -3946,7 +4081,7 @@ function renderPoolSummary(){
 
 function setClubSyncStatus(message,isError=false){const el=document.getElementById('clubSyncStatus');if(!el)return;el.textContent=message||'';el.style.color=isError?'var(--red)':'var(--text-muted)';}
 function showNoSquadMessage(message='Select or create a squad to get started'){activeSquadId=null;document.getElementById('squadContent').style.display='none';const empty=document.getElementById('noSquadMsg');empty.textContent=message;empty.style.display='flex';}
-function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),division:10,divisionManual:true,completionStage:0,completed:false,startersFormation:'',backupsFormation:'',starters:[],backups:[],substitutes:[],loans:[],energyDrains:{},energyRests:{}});sortSquads();renderSquadList();selectSquad(id);autoSave();}
+function addSquad(){const id='sq_'+Date.now();squads.push({id,name:'Squad '+(squads.length+1),division:10,divisionManual:true,completionStage:0,completed:false,startersFormation:'',backupsFormation:'',starters:[],backups:[],substitutes:[],loans:[],energyDrains:{},energyRests:{},energyTrainingIntensities:{}});sortSquads();renderSquadList();selectSquad(id);autoSave();}
 function deleteSquad(id){if(!confirm('Delete this club and its saved squad?'))return;squads=squads.filter(s=>s.id!==id);if(activeSquadId===id)showNoSquadMessage();renderSquadList();renderPoolSummary();autoSave();}
 function divisionOptions(selected){let options='';for(let division=1;division<=10;division++)options+=`<option value="${division}"${division===selected?' selected':''}>${DIVISION_NAMES[division]}</option>`;return options;}
 function changeSquadDivision(id,value){const squad=squads.find(item=>item.id===id);if(!squad)return;squad.division=normalizeDivision(value);squad.divisionManual=true;delete squad.sortOrder;sortSquads();renderSquadList();if(id===activeSquadId)updateSquadSizeCounter();autoSave();}
@@ -4008,7 +4143,7 @@ function renderSquadList(){
     d.addEventListener('click',()=>selectSquad(sq.id));divisionGroup.appendChild(d);
   });
 }
-function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};sq.energyRests={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
+function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};sq.energyRests={};sq.energyTrainingIntensities={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
 function deleteAllClubs(){if(!squads.length)return;if(!confirm(`Delete all ${squads.length} clubs and their saved squads?`))return;squads=[];clubsInitialized=true;showNoSquadMessage('No clubs saved. Use Update Clubs to restore your owned clubs.');renderSquadList();renderPoolSummary();setClubSyncStatus('All clubs deleted.');autoSave();}
 async function updateClubs(){const wallet=localStorage.getItem('mfl_last_wallet');if(!wallet){setClubSyncStatus('Load a wallet before updating clubs.',true);return;}const button=document.getElementById('updateClubsBtn');button.disabled=true;button.textContent='Updating…';setClubSyncStatus('Checking owned clubs…');try{const ownedClubs=await fetchOwnedClubs(wallet);const ownedIds=new Set(ownedClubs.map(club=>club.clubId));const removed=squads.filter(squad=>squad.isOwnedClub&&squad.clubId&&!ownedIds.has(String(squad.clubId)));if(removed.length&&!confirm(`Update Clubs will remove ${removed.length} club${removed.length===1?'':'s'} no longer owned by this wallet. Continue?`)){setClubSyncStatus('Club update cancelled.');return;}mergeOwnedClubs(ownedClubs,true);clubsInitialized=true;renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage(squads.length?'Select a club to build its squad.':'No MFL_OWNER clubs found for this wallet.');renderPoolSummary();autoSave();setClubSyncStatus(`${ownedClubs.length} owned club${ownedClubs.length===1?'':'s'} updated.`);}catch(error){setClubSyncStatus(error.message||'Clubs could not be updated.',true);}finally{button.disabled=false;button.textContent='Update Clubs';}}
 function selectSquad(id){activeSquadId=id;pendingCoverPlayerId=null;document.getElementById('noSquadMsg').style.display='none';document.getElementById('squadContent').style.display='block';const sq=squads.find(s=>s.id===id);if(!sq)return;sq.substitutes=Array.isArray(sq.substitutes)?sq.substitutes.slice(0,SUBSTITUTE_LIMIT):[];document.getElementById('squadNameInput').value=sq.name;document.getElementById('startersFormation').value=sq.startersFormation||'';document.getElementById('backupsFormation').value=sq.backupsFormation||'';updateNextSeasonToggle();renderPoolSummary();renderSquadList();renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();}

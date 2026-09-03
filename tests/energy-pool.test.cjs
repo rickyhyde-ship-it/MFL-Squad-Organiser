@@ -161,6 +161,17 @@ test('planner warnings do not save partial evidence as a finished pool scan', ()
   assert.equal(storage.size, 1);
 });
 
+test('planner warning counts are cached against each player training intensity', () => {
+  const { context } = harness();
+  context.document = { getElementById: () => ({ querySelectorAll: () => [], querySelector: () => null }) };
+  context.cacheEnergyModel({ ...model([]), complete: true, missingSources: [] });
+  context.updatePitchEnergyWarnings([{ index: 0, modelKey: profile.key, trainingIntensity: 'high' }], {
+    rows: [{ matchStarts: [{ energies: [6000], resting: [false] }] }],
+  });
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'high'), 1);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'low'), null);
+});
+
 test('pool scan and starting-XI planner agree for all training intensities and both schedules', async () => {
   const observations = Array.from({ length: 86 }, (_, index) => observation(1500 + index * 100, 1000, 2));
   const { context } = harness(responses({ models: [model(observations)] }, { models: [model(observations)] }));
@@ -303,7 +314,7 @@ test('team rest updates every visible starter, allows individual overrides, and 
     function hasEnergyDrainOverride(){return true;}
     function autoSave(){saveCount++;localStorage.setItem('squad',JSON.stringify(squad));}
     const document={getElementById:()=>({focus(){}})};
-    ${['slotPlayerKey','energyPlayerKey','getEnergyStarters','setEnergyRestForPlayer','toggleEnergyRest','toggleEnergyTeamRest'].map(functionSource).join('\n')}
+    ${['slotPlayerKey','energyPlayerKey','energyTrainingIntensityFor','getEnergyStarters','setEnergyRestForPlayer','toggleEnergyRest','toggleEnergyTeamRest'].map(functionSource).join('\n')}
   `);
   context.toggleEnergyRest(0, 9, 'cup');
   context.toggleEnergyTeamRest(7, 'league');
@@ -342,6 +353,64 @@ test('training formulas use missing raw energy, round once, and respect the ener
   assert.equal(context.energyAfterTraining(1500, 'medium'), 1500);
   assert.equal(context.energyAfterTraining(1500, 'high'), 1500);
   assert.equal(context.energyAfterTraining(2000, 'high'), 1500);
+});
+
+test('each starter can use a different training intensity in the same projection', () => {
+  const { context } = harness();
+  const starters = ['low', 'medium', 'high'].map(trainingIntensity => ({
+    drain: 20, manualDrain: true, trainingIntensity,
+  }));
+  const projection = context.calculateEnergyProjection(starters, [
+    { day: 1, training: false, league: true, cup: false },
+    { day: 2, training: true, league: false, cup: false },
+  ]);
+  assert.deepEqual(Array.from(projection.final), [8400, 8000, 7700]);
+});
+
+test('individual training overrides persist and a team change synchronizes every starter', () => {
+  const { context, read, storage } = harness();
+  read(`
+    let viewerMode=false,saveCount=0;
+    const squad={starters:[{playerId:1},{playerId:2}],energyTrainingIntensities:{}};
+    function activeSquad(){return squad;}
+    function autoSave(){saveCount++;}
+    const document={getElementById:()=>null,querySelector:()=>({focus(){}})};
+    ${['slotPlayerKey','energyPlayerKey','energyTrainingIntensityFor','setPlayerEnergyTrainingIntensity'].map(functionSource).join('\n')}
+  `);
+  context.setPlayerEnergyTrainingIntensity(0, 'medium');
+  assert.equal(read(`squad.energyTrainingIntensities['player:1']`), 'medium');
+  assert.equal(read(`energyTrainingIntensityFor(squad,squad.starters[0],0)`), 'medium');
+  assert.equal(read(`energyTrainingIntensityFor(squad,squad.starters[1],1)`), 'low');
+  context.setEnergyTrainingIntensity('high');
+  assert.equal(storage.get('mfl_energy_training_intensity'), 'high');
+  assert.equal(read('Object.keys(squad.energyTrainingIntensities).length'), 0);
+  assert.equal(read(`energyTrainingIntensityFor(squad,squad.starters[0],0)`), 'high');
+  assert.equal(read(`energyTrainingIntensityFor(squad,squad.starters[1],1)`), 'high');
+  assert.equal(read('saveCount'), 2);
+});
+
+test('starter controls render OVR, age, retirement status and individual training buttons', () => {
+  const context = vm.createContext({});
+  vm.runInContext(`
+    const ENERGY_TRAINING_MODES=['low','medium','high'];
+    const ENERGY_TRAINING_DESCRIPTIONS={low:'Low',medium:'Medium',high:'High'};
+    let energyTrainingIntensity='low',viewerMode=false,nextSeasonMode=false;
+    function isNextSeasonMode(){return nextSeasonMode;}
+    function projectedRetirementYears(value){if(value===null||value===undefined||value==='')return null;return Number(value);}
+    function getOvrColor(){return '#fff';}
+    function escAttr(value){return String(value);}
+    ${functionSource('energyPlayerRetirementMeta')}
+    ${functionSource('renderEnergyPlayerMeta')}
+    ${functionSource('renderEnergyPlayerTrainingOptions')}
+  `, context);
+  const playerMeta = context.renderEnergyPlayerMeta({ ovr: 84, age: 31, retireIn: 2 });
+  assert.match(playerMeta, /OVR <strong[^>]*>84<\/strong>/);
+  assert.match(playerMeta, /Age <strong>31<\/strong>/);
+  assert.match(playerMeta, /data-level="orange"[^>]*>Retires 2S/);
+  assert.doesNotMatch(context.renderEnergyPlayerMeta({ ovr: 80, age: 24, retireIn: null }), /is-retirement/);
+  const controls = context.renderEnergyPlayerTrainingOptions({ index: 3, trainingIntensity: 'medium', player: { name: 'Test Player' } });
+  assert.equal((controls.match(/class="energy-player-training-option"/g) || []).length, 3);
+  assert.match(controls, /data-intensity="medium" aria-pressed="true"/);
 });
 
 test('each intensity trains once before double matches, supports rest, and skips non-training days', () => {
