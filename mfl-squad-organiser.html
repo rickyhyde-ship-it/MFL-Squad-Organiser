@@ -1892,6 +1892,13 @@ button.substitute-card:not(.is-filled):focus-visible {
   align-items: flex-end;
   gap: 8px;
 }
+.energy-planner-switches { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: flex-end; gap: 8px; }
+.energy-training-control { padding: 7px 9px; border: 1px solid var(--border-light); border-radius: 8px 8px 8px 3px; background: rgba(10, 14, 19, .76); }
+.energy-training-label { display: block; margin-bottom: 5px; color: var(--text-secondary); font: 700 9px 'JetBrains Mono', monospace; }
+.energy-training-options { display: flex; gap: 4px; }
+.energy-training-option { padding: 5px 9px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font: 600 10px 'JetBrains Mono', monospace; }
+.energy-training-option:focus-visible { outline: 2px solid #caa7ff; outline-offset: 2px; }
+.energy-training-option[aria-pressed="true"] { color: #e0ccff; background: rgba(168, 85, 247, .23); }
 
 .energy-schedule-toggle {
   display: inline-flex;
@@ -2182,6 +2189,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 @media (max-width: 900px) {
   .energy-planner-header { flex-direction: column; gap: 12px; }
   .energy-planner-actions { width: 100%; align-items: flex-start; }
+  .energy-planner-switches { justify-content: flex-start; }
   .energy-planner-badges { justify-content: flex-start; }
   .energy-summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
@@ -2313,13 +2321,23 @@ button.substitute-card:not(.is-filled):focus-visible {
             <div>
               <div class="energy-planner-kicker">Season 17 workload</div>
               <h2 class="energy-planner-title" id="energyPlannerTitle">Starting XI energy planner</h2>
-              <p class="energy-planner-copy">Match drain is modelled from real comparable players at the energy they start each game. Low training restores 20% of missing energy before games on Days 2–29.</p>
+              <p class="energy-planner-copy">Match drain is modelled from real comparable players at the energy they start each game. <span id="energyTrainingDescription">Low training restores 20% of missing energy before games on Days 2–29.</span></p>
             </div>
             <div class="energy-planner-actions">
+              <div class="energy-planner-switches">
               <button type="button" class="energy-schedule-toggle" id="energyScheduleToggle" role="switch" aria-checked="false" onclick="toggleEnergyScheduleMode()">
                 <span class="energy-toggle-rail" aria-hidden="true"><i></i></span>
                 <span class="energy-toggle-copy"><strong>28-game schedule</strong><small>First 6 cups · no league D31–33</small></span>
               </button>
+              <div class="energy-training-control" role="group" aria-labelledby="energyTrainingLabel" aria-describedby="energyTrainingDescription">
+                <span class="energy-training-label" id="energyTrainingLabel">Training intensity</span>
+                <div class="energy-training-options">
+                  <button type="button" class="energy-training-option" data-intensity="low" aria-pressed="true" onclick="setEnergyTrainingIntensity('low')" title="Gain 20% of missing energy">Low</button>
+                  <button type="button" class="energy-training-option" data-intensity="medium" aria-pressed="false" onclick="setEnergyTrainingIntensity('medium')" title="No energy gained or lost">Medium</button>
+                  <button type="button" class="energy-training-option" data-intensity="high" aria-pressed="false" onclick="setEnergyTrainingIntensity('high')" title="Lose 1% of full energy plus 10% of missing energy">High</button>
+                </div>
+              </div>
+              </div>
               <div class="energy-planner-badges" aria-label="Schedule summary">
                 <span id="energyMatchCountBadge">35 matches</span><span>28 training days</span><span>15% floor</span>
               </div>
@@ -2417,6 +2435,12 @@ const ENERGY_MAX_RAW=10000;
 const ENERGY_FLOOR_RAW=1500;
 const ENERGY_LOW_RAW=6000;
 const ENERGY_REST_RECOVERY=0.65;
+const ENERGY_TRAINING_MODES=['low','medium','high'];
+const ENERGY_TRAINING_DESCRIPTIONS={
+  low:'Low training restores 20% of missing energy before games on Days 2–29.',
+  medium:'Medium training leaves energy unchanged before games on Days 2–29.',
+  high:'High training costs 1% of full energy plus 10% of missing energy before games on Days 2–29, with a 15% floor.'
+};
 const ENERGY_MATCH_TOLERANCE_RAW=300;
 const ENERGY_POOL_BATCH_SIZE=11;
 // These completed collection windows do not overlap, so their sample counts can be pooled.
@@ -2430,6 +2454,7 @@ const energyModelRequests=new Set();
 const energyModelFailures=new Map();
 let energyModelMessage='Loading real-match energy evidence…';
 let energyLimitedSchedule=localStorage.getItem('mfl_energy_limited_schedule')==='1';
+let energyTrainingIntensity=normalizeEnergyTrainingIntensity(localStorage.getItem('mfl_energy_training_intensity'));
 const ENERGY_SCHEDULE=[
   {day:1,training:false,league:true,cup:false},
   {day:2,training:true,league:true,cup:false},
@@ -2482,6 +2507,22 @@ function toggleEnergyScheduleMode(){
   energyLimitedSchedule=!energyLimitedSchedule;
   localStorage.setItem('mfl_energy_limited_schedule',energyLimitedSchedule?'1':'0');
   renderEnergyPlanner(false);
+}
+
+function normalizeEnergyTrainingIntensity(value){return ENERGY_TRAINING_MODES.includes(value)?value:'low';}
+
+function energyAfterTraining(energy,intensity=energyTrainingIntensity){
+  const missing=ENERGY_MAX_RAW-energy;
+  if(intensity==='medium')return energy;
+  if(intensity==='high')return Math.max(ENERGY_FLOOR_RAW,Math.round(energy-ENERGY_MAX_RAW*0.01-missing*0.1));
+  return Math.round(energy+missing*0.2);
+}
+
+function setEnergyTrainingIntensity(value){
+  energyTrainingIntensity=normalizeEnergyTrainingIntensity(value);
+  localStorage.setItem('mfl_energy_training_intensity',energyTrainingIntensity);
+  renderEnergyPlanner(false);
+  if(document.getElementById('addPlayerModal')?.classList.contains('open'))applyFilters();
 }
 const DIVISION_MIN_OVR={1:88,2:85,3:82,4:78,5:74,6:70,7:65,8:56,9:46,10:null};
 const DIVISION_NAMES={1:'Diamond',2:'Plat',3:'Gold',4:'Silver',5:'Bronze',6:'Iron',7:'Stone',8:'Ice',9:'Spark',10:'Flint'};
@@ -2751,14 +2792,16 @@ function saveEnergyProjectionCounts(){
   catch(error){console.warn('Energy projection cache could not be saved',error);}
 }
 
-function storedEnergyProjectionCount(modelKey,limited=energyLimitedSchedule){
+function energyProjectionCountKey(modelKey,intensity=energyTrainingIntensity){return intensity==='low'?modelKey:`${intensity}:${modelKey}`;}
+
+function storedEnergyProjectionCount(modelKey,limited=energyLimitedSchedule,intensity=energyTrainingIntensity){
   if(!modelKey)return null;
-  const value=energyProjectionCounts[limited?'limited':'full']?.[modelKey];
+  const value=energyProjectionCounts[limited?'limited':'full']?.[energyProjectionCountKey(modelKey,intensity)];
   return Number.isFinite(Number(value))?Number(value):null;
 }
 
 function energyPoolReadyCount(profiles){
-  return profiles.reduce((count,profile)=>count+Number(storedEnergyProjectionCount(profile.key,false)!==null&&storedEnergyProjectionCount(profile.key,true)!==null),0);
+  return profiles.reduce((count,profile)=>count+Number(ENERGY_TRAINING_MODES.every(intensity=>storedEnergyProjectionCount(profile.key,false,intensity)!==null&&storedEnergyProjectionCount(profile.key,true,intensity)!==null)),0);
 }
 
 function updateEnergyPoolScanPanel(progress=null){
@@ -2793,7 +2836,7 @@ async function startEnergyPoolScan(){
   if(energyPoolScanning||!careerScanWallet||!allPlayers.length)return;
   const profiles=[...energyPoolProfiles().values()],ready=energyPoolReadyCount(profiles);
   energyPoolScanForce=ready===profiles.length&&profiles.length>0;
-  const pending=energyPoolScanForce?profiles:profiles.filter(profile=>storedEnergyProjectionCount(profile.key,false)===null||storedEnergyProjectionCount(profile.key,true)===null);
+  const pending=energyPoolScanForce?profiles:profiles.filter(profile=>!energyPoolReadyCount([profile]));
   if(!pending.length)return;
   energyPoolScanning=true;energyPoolScanStop=false;
   const scanButton=document.getElementById('energyPoolScanButton'),stopButton=document.getElementById('energyPoolScanStopButton');
@@ -2812,8 +2855,11 @@ async function startEnergyPoolScan(){
           if(activeKeys.has(profile.key))cacheEnergyModel(model);
           // Partial evidence can power the planner, but must remain retryable in the pool scan.
           if(!model.complete){failures+=1;return;}
-          energyProjectionCounts.full[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false));
-          energyProjectionCounts.limited[profile.key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(true));
+          ENERGY_TRAINING_MODES.forEach(intensity=>{
+            const key=energyProjectionCountKey(profile.key,intensity);
+            energyProjectionCounts.full[key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false),intensity);
+            energyProjectionCounts.limited[key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(true),intensity);
+          });
         });
       }catch(error){
         failures+=batch.length;
@@ -3087,12 +3133,12 @@ function energyUseFor(starter,energyRaw){
   return prediction?{...prediction,source:prediction.tier==='widened'?'widened':'model'}:{drainRaw:Math.round(starter.drain*100),sampleSize:0,source:starter.manualDrain?'manual':'fallback'};
 }
 
-function lowStartCountForEnergyModel(profile,model,schedule){
+function lowStartCountForEnergyModel(profile,model,schedule,intensity=energyTrainingIntensity){
   const retirement=Number(profile.retirement),fallbackDrain=retirement===1?7:retirement===2?5:ENERGY_DEFAULT_DRAIN;
   const starter={manualDrain:false,modelKey:profile.key,drain:fallbackDrain};
   let energy=ENERGY_MAX_RAW,count=0;
   schedule.forEach(day=>{
-    if(day.training)energy=Math.round(energy+(ENERGY_MAX_RAW-energy)*0.2);
+    if(day.training)energy=energyAfterTraining(energy,intensity);
     const matchCount=Number(day.league)+Number(day.cup);
     for(let match=0;match<matchCount;match++){
       if(energy<=ENERGY_LOW_RAW)count+=1;
@@ -3103,7 +3149,7 @@ function lowStartCountForEnergyModel(profile,model,schedule){
   return count;
 }
 
-function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
+function calculateEnergyProjection(starters,schedule=activeEnergySchedule(),intensity=energyTrainingIntensity){
   let energies=starters.map(()=>ENERGY_MAX_RAW);
   const rows=[];
   let lowest=ENERGY_MAX_RAW;
@@ -3112,7 +3158,7 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule()){
 
   schedule.forEach(scheduleDay=>{
     const start=energies.slice();
-    if(scheduleDay.training)energies=energies.map(energy=>Math.round(energy+(ENERGY_MAX_RAW-energy)*0.2));
+    if(scheduleDay.training)energies=energies.map(energy=>energyAfterTraining(energy,intensity));
     const afterTraining=energies.slice();
     const matchTypes=['league','cup'].filter(type=>scheduleDay[type]);
     const matchStarts=[];
@@ -3163,7 +3209,8 @@ function updatePitchEnergyWarnings(starters,projection){
     // Saved pool counts describe playing every match, independently of squad rest choices.
     if(projection.rows.some(row=>row.matchStarts.some(match=>match.resting?.[index])))return;
     const count=lowStarts.get(entry.index)||0;
-    if(Number(countBucket[entry.modelKey])!==count){countBucket[entry.modelKey]=count;cacheChanged=true;}
+    const key=energyProjectionCountKey(entry.modelKey);
+    if(Number(countBucket[key])!==count){countBucket[key]=count;cacheChanged=true;}
   });
   if(cacheChanged)saveEnergyProjectionCounts();
   starters.forEach(entry=>{
@@ -3245,6 +3292,9 @@ function renderEnergyPlanner(refreshControls=true){
   const scheduleMatchCount=schedule.reduce((total,day)=>total+Number(day.league)+Number(day.cup),0);
   if(scheduleToggle)scheduleToggle.setAttribute('aria-checked',String(energyLimitedSchedule));
   if(matchCountBadge)matchCountBadge.textContent=`${scheduleMatchCount} matches`;
+  document.querySelectorAll('.energy-training-option').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.intensity===energyTrainingIntensity)));
+  const trainingDescription=document.getElementById('energyTrainingDescription');
+  if(trainingDescription)trainingDescription.textContent=ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity];
   const squad=activeSquad();
   const starters=getEnergyStarters(squad);
   if(!squad||!starters.length){
@@ -3293,7 +3343,7 @@ function renderEnergyPlanner(refreshControls=true){
   const body=projection.rows.map(row=>{
     const day=row.scheduleDay;
     const events=[];
-    if(day.training)events.push('<span class="energy-event training">Train 08:00</span>');
+    if(day.training)events.push(`<span class="energy-event training" title="${escAttr(ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity])}">${energyTrainingIntensity} 08:00</span>`);
     row.matchStarts.forEach(match=>{
       const restCount=starters.length-match.playingCount;
       const allResting=restCount===starters.length;

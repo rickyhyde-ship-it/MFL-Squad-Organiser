@@ -20,6 +20,18 @@ The windows do not overlap. This matters because the model endpoints return aggr
 - If one service fails or times out, the planner can use the available source and identifies the missing collection. Partial evidence is eligible for retry after 60 seconds when the planner next renders. It never replaces an already complete cached model or becomes a completed saved pool scan.
 - Saved projection counts use the `mfl_energy_projection_counts_v2_` prefix, so old single-collection counts are ignored. Run **Update energy drain** to populate the player list from the combined pool.
 
+## Training and rest choices
+
+The training intensity control beside the schedule toggle applies once before matches on each training day (Days 2–29). Low is the default, and the selected intensity is saved in this browser.
+
+- **Low:** `energy + 0.20 * (10000 - energy)`.
+- **Medium:** no energy change.
+- **High:** `energy - 100 - 0.10 * (10000 - energy)`, with the existing 1500 energy floor.
+
+Calculations use raw energy and round the result to whole raw units. The daily table, pitch warnings and player-pool projections all use the selected intensity. The energy scan stores separate counts for all three intensities and both schedules; existing Low counts remain valid.
+
+Team and individual rest choices are preserved when intensity changes. Rest restores 65% of the energy missing at that match's start, with no match drain. On double-match days, training happens once, followed by G1 and G2 in order.
+
 ## Verification and publishing
 
 Run `node --test MFL-Squad-Organiser/tests/energy-pool.test.cjs` from the workspace root. The tests cover sample weighting, standard/widened precedence, outages, retries, cache invalidation and consistency between planner and scan calculations.

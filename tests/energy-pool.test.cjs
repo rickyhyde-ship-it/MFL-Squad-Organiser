@@ -35,7 +35,7 @@ function harness(fetch = async () => { throw new Error('Unexpected request'); })
       'loadEnergyModels', 'energyModelsPending', 'predictionFromEnergyObservations', 'modelPredictionFromEnergyModel',
       'lowStartCountForEnergyModel', 'calculateEnergyProjection', 'energyUseFor', 'modelPredictionFor',
       'energyProjectionStorageKey', 'loadEnergyProjectionCounts', 'saveEnergyProjectionCounts',
-      'storedEnergyProjectionCount', 'updatePitchEnergyWarnings'].map(functionSource).join('\n')}
+      'energyProjectionCountKey', 'storedEnergyProjectionCount', 'energyPoolReadyCount', 'updatePitchEnergyWarnings'].map(functionSource).join('\n')}
   `, context);
   return { context, storage, read: code => vm.runInContext(code, context) };
 }
@@ -161,17 +161,19 @@ test('planner warnings do not save partial evidence as a finished pool scan', ()
   assert.equal(storage.size, 1);
 });
 
-test('pool scan and starting-XI planner agree for both schedules', async () => {
+test('pool scan and starting-XI planner agree for all training intensities and both schedules', async () => {
   const observations = Array.from({ length: 86 }, (_, index) => observation(1500 + index * 100, 1000, 2));
   const { context } = harness(responses({ models: [model(observations)] }, { models: [model(observations)] }));
   const { models: [pooled] } = await context.fetchPooledEnergyModels([profile]);
   context.cacheEnergyModel(pooled);
   for (const limited of [false, true]) {
+    for (const intensity of ['low', 'medium', 'high']) {
     const schedule = context.energyScheduleForMode(limited);
-    const projection = context.calculateEnergyProjection([{ modelKey: profile.key, drain: 4 }], schedule);
+    const projection = context.calculateEnergyProjection([{ modelKey: profile.key, drain: 4 }], schedule, intensity);
     const count = projection.rows.reduce((sum, row) => sum + row.matchStarts.filter(match => match.energies[0] <= 6000).length, 0);
     assert.ok(count > 0);
-    assert.equal(context.lowStartCountForEnergyModel(profile, pooled, schedule), count);
+    assert.equal(context.lowStartCountForEnergyModel(profile, pooled, schedule, intensity), count);
+    }
   }
 });
 
@@ -325,4 +327,87 @@ test('team rest updates every visible starter, allows individual overrides, and 
   context.toggleEnergyRest(0, 7, 'cup');
   assert.equal(read('saveCount'), savedCount);
   assert.equal(read(`getEnergyStarters(squad).every(entry=>entry.restMatches['7:cup']===true)`), true);
+});
+
+test('training formulas use missing raw energy, round once, and respect the energy floor', () => {
+  const { context } = harness();
+  assert.equal(context.energyAfterTraining(8000, 'low'), 8400);
+  assert.equal(context.energyAfterTraining(8000, 'medium'), 8000);
+  assert.equal(context.energyAfterTraining(8000, 'high'), 7700);
+  assert.equal(context.energyAfterTraining(10000, 'high'), 9900);
+  assert.equal(context.energyAfterTraining(9589, 'low'), 9671);
+  assert.equal(context.energyAfterTraining(9589, 'medium'), 9589);
+  assert.equal(context.energyAfterTraining(9589, 'high'), 9448);
+  assert.equal(context.energyAfterTraining(1500, 'low'), 3200);
+  assert.equal(context.energyAfterTraining(1500, 'medium'), 1500);
+  assert.equal(context.energyAfterTraining(1500, 'high'), 1500);
+  assert.equal(context.energyAfterTraining(2000, 'high'), 1500);
+});
+
+test('each intensity trains once before double matches, supports rest, and skips non-training days', () => {
+  const { context } = harness();
+  const schedule = [
+    { day: 1, training: false, league: true, cup: false },
+    { day: 7, training: true, league: true, cup: true },
+    { day: 30, training: false, league: false, cup: false },
+    { day: 31, training: false, league: true, cup: false },
+  ];
+  const expected = {
+    low: { before: 8400, recovered: 9440, end: 7440 },
+    medium: { before: 8000, recovered: 9300, end: 7300 },
+    high: { before: 7700, recovered: 9195, end: 7195 },
+  };
+  for (const [intensity, values] of Object.entries(expected)) {
+    const projection = context.calculateEnergyProjection([{ drain: 20, manualDrain: true, restMatches: { '7:league': true } }], schedule, intensity);
+    assert.equal(projection.rows[0].afterTraining[0], 10000);
+    assert.equal(projection.rows[1].afterTraining[0], values.before);
+    assert.equal(projection.rows[1].matchStarts[1].energies[0], values.recovered);
+    assert.equal(projection.rows[1].end[0], values.end);
+    assert.equal(projection.rows[2].end[0], values.end);
+    assert.equal(projection.rows[3].matchStarts[0].energies[0], values.end);
+    const trainingOnly = context.calculateEnergyProjection([{ drain: 20, manualDrain: true }], [schedule[0], { day: 15, training: true, league: false, cup: false }], intensity);
+    assert.equal(trainingOnly.rows[1].end[0], values.before);
+  }
+});
+
+test('training selection persists and invalid or missing values fall back to Low', () => {
+  const { context, read, storage } = harness();
+  context.document = { getElementById: () => null };
+  assert.equal(read('energyTrainingIntensity'), 'low');
+  assert.equal(context.normalizeEnergyTrainingIntensity(null), 'low');
+  assert.equal(context.normalizeEnergyTrainingIntensity('invalid'), 'low');
+  context.setEnergyTrainingIntensity('high');
+  assert.equal(storage.get('mfl_energy_training_intensity'), 'high');
+  assert.equal(read('energyTrainingIntensity'), 'high');
+  assert.equal(context.energyAfterTraining(8000), 7700);
+  context.setEnergyTrainingIntensity('medium');
+  assert.equal(context.energyAfterTraining(8000), 8000);
+  assert.equal(read('renderCount'), 2);
+});
+
+test('saved low counts remain compatible and all six training/schedule counts stay separate', () => {
+  const { context, read, storage } = harness();
+  context.document = { getElementById: () => ({ querySelectorAll: () => [], querySelector: () => null }) };
+  context.cacheEnergyModel({ ...model([]), complete: true, missingSources: [] });
+  storage.set('mfl_energy_projection_counts_v2_wallet', JSON.stringify({ full: { [profile.key]: 4 }, limited: { [profile.key]: 1 } }));
+  context.loadEnergyProjectionCounts();
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'low'), 4);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'medium'), null);
+  assert.equal(context.energyPoolReadyCount([profile]), 0);
+  for (const intensity of ['medium', 'high']) {
+    for (const limited of [false, true]) {
+      read(`energyTrainingIntensity='${intensity}';energyLimitedSchedule=${limited};`);
+      const count = intensity === 'medium' ? (limited ? 7 : 10) : (limited ? 18 : 25);
+      context.updatePitchEnergyWarnings([{ index: 0, modelKey: profile.key }], {
+        rows: [{ matchStarts: Array.from({ length: count }, () => ({ energies: [6000], resting: [false] })) }],
+      });
+      assert.equal(context.storedEnergyProjectionCount(profile.key), count);
+    }
+  }
+  context.loadEnergyProjectionCounts();
+  assert.equal(context.energyPoolReadyCount([profile]), 1);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'low'), 4);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, true, 'low'), 1);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'medium'), 10);
+  assert.equal(context.storedEnergyProjectionCount(profile.key, true, 'high'), 18);
 });
