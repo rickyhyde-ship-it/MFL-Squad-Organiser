@@ -310,8 +310,7 @@ test('team rest updates every visible starter, allows individual overrides, and 
     function playerForSlot(slot){return slot?{name:'Player '+slot.playerId}:null;}
     function isSlotIgnoredNextSeason(){return false;}
     function energyProfileFor(){return null;}
-    function energyDrainFor(){return 4;}
-    function hasEnergyDrainOverride(){return true;}
+    function defaultEnergyDrainFor(){return 4;}
     function autoSave(){saveCount++;localStorage.setItem('squad',JSON.stringify(squad));}
     const document={getElementById:()=>({focus(){}})};
     ${['slotPlayerKey','energyPlayerKey','energyTrainingIntensityFor','getEnergyStarters','setEnergyRestForPlayer','toggleEnergyRest','toggleEnergyTeamRest'].map(functionSource).join('\n')}
@@ -411,6 +410,12 @@ test('starter controls render OVR, age, retirement status and individual trainin
   const controls = context.renderEnergyPlayerTrainingOptions({ index: 3, trainingIntensity: 'medium', player: { name: 'Test Player' } });
   assert.equal((controls.match(/class="energy-player-training-option"/g) || []).length, 3);
   assert.match(controls, /data-intensity="medium" aria-pressed="true"/);
+});
+
+test('Starting XI controls do not expose legacy custom drain inputs', () => {
+  assert.doesNotMatch(html, /class="energy-drain-input"/);
+  assert.doesNotMatch(html, /function updateEnergyDrain\(/);
+  assert.match(html, /return`<div class="energy-player-control\$\{fallback\?' is-fallback':''\}">\$\{renderEnergyPlayerIdentity\(entry,source\)\}\$\{renderEnergyPlayerTrainingOptions\(entry\)\}<\/div>`/);
 });
 
 test('each intensity trains once before double matches, supports rest, and skips non-training days', () => {

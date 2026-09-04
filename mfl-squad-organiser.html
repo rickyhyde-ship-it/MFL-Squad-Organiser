@@ -2223,7 +2223,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
 .energy-player-control {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto auto;
+  grid-template-columns: minmax(120px, 1fr) auto;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -2335,37 +2335,11 @@ button.substitute-card:not(.is-filled):focus-visible {
 .energy-player-training-option:focus-visible { box-shadow: 0 0 0 2px rgba(192,132,252,.4); }
 .energy-player-training-option[aria-pressed="true"] { border-color: rgba(72,245,154,.5); background: rgba(72,245,154,.1); color: #a8f5cd; }
 
-.energy-drain-field { display: flex; align-items: center; gap: 4px; }
-
 @media (max-width: 520px) {
   .energy-starter-controls { grid-template-columns: 1fr; }
   .energy-player-control { grid-template-columns: minmax(0, 1fr) auto; }
   .energy-player-training { grid-column: 1 / -1; grid-row: 2; }
   .energy-player-training-options { width: max-content; }
-}
-
-.energy-drain-input {
-  width: 58px;
-  padding: 5px 5px;
-  border: 1px solid var(--border-light);
-  border-radius: 5px;
-  outline: none;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font: 700 11px 'JetBrains Mono', monospace;
-  text-align: right;
-}
-.energy-drain-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-
-.energy-use-model {
-  min-height: 27px;
-  padding: 4px 6px;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  background: var(--accent-glow);
-  color: var(--accent);
-  font: 700 7px 'JetBrains Mono', monospace;
-  cursor: pointer;
 }
 
 .energy-table-heading {
@@ -3294,17 +3268,6 @@ function setPlayerEnergyTrainingIntensity(starterIndex,value){
   document.querySelector(`.energy-player-training-option[data-starter-index="${starterIndex}"][data-intensity="${intensity}"]`)?.focus({preventScroll:true});
 }
 
-function normalizeEnergyDrain(value){
-  const numeric=Number(value);
-  if(!Number.isFinite(numeric))return ENERGY_DEFAULT_DRAIN;
-  return Math.round(Math.min(20,Math.max(0,numeric))*10)/10;
-}
-
-function hasEnergyDrainOverride(squad,slot,index){
-  const key=energyPlayerKey(slot,index);
-  return Boolean(squad?.energyDrains&&typeof squad.energyDrains==='object'&&Object.prototype.hasOwnProperty.call(squad.energyDrains,key));
-}
-
 function defaultEnergyDrainFor(player){
   const retirementYears=projectedRetirementYears(player?.retireIn);
   if(retirementYears===1)return 7;
@@ -3312,17 +3275,11 @@ function defaultEnergyDrainFor(player){
   return ENERGY_DEFAULT_DRAIN;
 }
 
-function energyDrainFor(squad,slot,index,player=playerForSlot(slot)){
-  squad.energyDrains=squad.energyDrains&&typeof squad.energyDrains==='object'?squad.energyDrains:{};
-  const key=energyPlayerKey(slot,index);
-  return Object.prototype.hasOwnProperty.call(squad.energyDrains,key)?normalizeEnergyDrain(squad.energyDrains[key]):defaultEnergyDrainFor(player);
-}
-
 function getEnergyStarters(squad){
   return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>{
     const profile=energyProfileFor(entry);
     const key=energyPlayerKey(entry.slot,entry.index);
-    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:energyDrainFor(squad,entry.slot,entry.index,entry.player),manualDrain:hasEnergyDrainOverride(squad,entry.slot,entry.index),profile,modelKey:profile?energyModelKey(profile):null};
+    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:defaultEnergyDrainFor(entry.player),profile,modelKey:profile?energyModelKey(profile):null};
   });
 }
 
@@ -3592,26 +3549,6 @@ function updatePitchEnergyWarnings(starters,projection){
 
 function formatEnergy(valueRaw){return`${Math.ceil(Number(valueRaw)/100)}%`;}
 
-function updateEnergyDrain(starterIndex,value){
-  if(viewerMode)return;
-  const squad=activeSquad();
-  const slot=squad?.starters?.[starterIndex];
-  if(!squad||!slot)return;
-  squad.energyDrains=squad.energyDrains&&typeof squad.energyDrains==='object'?squad.energyDrains:{};
-  squad.energyDrains[energyPlayerKey(slot,starterIndex)]=normalizeEnergyDrain(value);
-  renderEnergyPlanner(true);
-  autoSave();
-}
-
-function clearEnergyDrainOverride(starterIndex){
-  if(viewerMode)return;
-  const squad=activeSquad(),slot=squad?.starters?.[starterIndex];
-  if(!squad||!slot||!squad.energyDrains)return;
-  delete squad.energyDrains[energyPlayerKey(slot,starterIndex)];
-  renderEnergyPlanner(true);
-  autoSave();
-}
-
 function setEnergyRestForPlayer(squad,key,matchKey,resting){
   squad.energyRests=squad.energyRests&&typeof squad.energyRests==='object'?squad.energyRests:{};
   const rests=squad.energyRests[key]&&typeof squad.energyRests[key]==='object'?squad.energyRests[key]:{};
@@ -3727,10 +3664,10 @@ function renderEnergyPlanner(refreshControls=true){
 
   if(refreshControls){
     controls.innerHTML=starters.map(entry=>{
-      const prediction=modelPredictionFor(entry,ENERGY_MAX_RAW),displayDrain=entry.manualDrain?entry.drain:prediction?prediction.drainRaw/100:entry.drain;
-      const fallback=!entry.manualDrain&&!prediction;
-      const source=entry.manualDrain?'Manual fixed drain':prediction?`${prediction.tier==='widened'?'Widened model −10/+5':'Historic model −5/+5'} · ${prediction.sampleSize.toLocaleString()} matches within ±300 raw`:entry.modelKey&&energyModelCache.has(entry.modelKey)?'FALLBACK · no historic match after −10/+5 retry':'FALLBACK · player profile unavailable';
-      return`<div class="energy-player-control${fallback?' is-fallback':''}">${renderEnergyPlayerIdentity(entry,source)}${renderEnergyPlayerTrainingOptions(entry)}<span class="energy-drain-field"><input class="energy-drain-input" type="number" min="0" max="20" step="0.1" inputmode="decimal" value="${displayDrain.toFixed(1)}" title="Edit to use a fixed manual drain" aria-label="Energy drain per match for ${escAttr(entry.player.name)}" onchange="updateEnergyDrain(${entry.index},this.value)"${viewerMode?' disabled':''}>${entry.manualDrain&&!viewerMode?`<button type="button" class="energy-use-model" onclick="clearEnergyDrainOverride(${entry.index})" title="Return to the real-match model">AUTO</button>`:''}</span></div>`;
+      const prediction=modelPredictionFor(entry,ENERGY_MAX_RAW);
+      const fallback=!prediction;
+      const source=prediction?`${prediction.tier==='widened'?'Widened model −10/+5':'Historic model −5/+5'} · ${prediction.sampleSize.toLocaleString()} matches within ±300 raw`:entry.modelKey&&energyModelCache.has(entry.modelKey)?'FALLBACK · no historic match after −10/+5 retry':'FALLBACK · player profile unavailable';
+      return`<div class="energy-player-control${fallback?' is-fallback':''}">${renderEnergyPlayerIdentity(entry,source)}${renderEnergyPlayerTrainingOptions(entry)}</div>`;
     }).join('');
   }
 
