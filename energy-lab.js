@@ -19,7 +19,13 @@
     const getUse = hooks?.energyUse || global.energyUseFor;
     const maxRaw = Number(hooks?.maxRaw ?? global.ENERGY_MAX_RAW ?? 10000);
     const floorRaw = Number(hooks?.floorRaw ?? global.ENERGY_FLOOR_RAW ?? 1500);
-    const recoveryRate = Number(hooks?.recoveryRate ?? global.ENERGY_REST_RECOVERY ?? .65);
+    const defaultRecoveryRate = Number(hooks?.recoveryRate ?? global.ENERGY_REST_RECOVERY ?? .65);
+    const recoveryRateFor = typeof hooks?.recoveryRateFor === 'function' ? hooks.recoveryRateFor : player => {
+      const retirementYears = Number(player?.starter?.retirementYears ?? player?.starter?.profile?.retirement ?? player?.starter?.player?.retireIn);
+      if (retirementYears === 1) return .35;
+      if (retirementYears === 2) return .55;
+      return defaultRecoveryRate;
+    };
     let energies = players.map(player => Math.round(clampNumber(player.startingEnergy, 15, 100, 100) * 100));
     let autoRests = 0;
     let gamesPlayed = 0;
@@ -42,6 +48,7 @@
           const thresholdRaw = Math.round(clampNumber(player.threshold, 15, 100, 89) * 100);
           const resting = before[index] <= thresholdRaw;
           if (resting) {
+            const recoveryRate = clampNumber(recoveryRateFor(player), 0, 1, defaultRecoveryRate);
             const recoveryRaw = Math.round((maxRaw - before[index]) * recoveryRate);
             autoRests += 1;
             return { resting: true, beforeRaw: before[index], drainRaw: 0, recoveryRaw, source: 'auto-rest', sampleSize: 0 };
@@ -179,6 +186,7 @@
       player: modelPlayer,
       trainingIntensity: item.trainingIntensity,
       drain: typeof defaultEnergyDrainFor === 'function' ? defaultEnergyDrainFor(modelPlayer) : 4,
+      retirementYears: typeof projectedRetirementYears === 'function' ? projectedRetirementYears(modelPlayer?.retireIn) : modelPlayer?.retireIn,
       manualDrain: false,
     };
     const profile = typeof energyProfileFor === 'function' ? energyProfileFor(entry) : null;
@@ -294,6 +302,7 @@
       maxRaw: typeof ENERGY_MAX_RAW !== 'undefined' ? ENERGY_MAX_RAW : 10000,
       floorRaw: typeof ENERGY_FLOOR_RAW !== 'undefined' ? ENERGY_FLOOR_RAW : 1500,
       recoveryRate: typeof ENERGY_REST_RECOVERY !== 'undefined' ? ENERGY_REST_RECOVERY : .65,
+      recoveryRateFor: player => typeof energyRestRecoveryRateFor === 'function' ? energyRestRecoveryRateFor(player.starter) : .65,
     });
     renderOutputs();
   }

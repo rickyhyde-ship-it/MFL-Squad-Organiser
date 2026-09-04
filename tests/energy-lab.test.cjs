@@ -60,6 +60,20 @@ test('threshold rests are inclusive: equal and lower rest, higher plays', () => 
   assert.deepEqual(projection.gamesPlayedByPlayer, [0, 0, 1]);
 });
 
+test('auto-rest uses retirement-tier recovery rates', () => {
+  const projection = calculateProjection(
+    [
+      player({ startingEnergy: 60, threshold: 60, starter: { drainRaw: 2500 } }),
+      player({ startingEnergy: 60, threshold: 60, starter: { drainRaw: 2500, player: { retireIn: 3 } } }),
+      player({ startingEnergy: 60, threshold: 60, starter: { drainRaw: 2500, player: { retireIn: 2 } } }),
+      player({ startingEnergy: 60, threshold: 60, starter: { drainRaw: 2500, player: { retireIn: 1 } } }),
+    ],
+    [{ day: 1, training: false, league: true, cup: false }],
+    hooks,
+  );
+  assert.deepEqual(projection.final, [8600, 8600, 8200, 7400]);
+});
+
 test('missing thresholds use the 89% default rest limit', () => {
   const projection = calculateProjection(
     [player({ startingEnergy: 89, threshold: undefined })],

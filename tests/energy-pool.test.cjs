@@ -33,7 +33,7 @@ function harness(fetch = async () => { throw new Error('Unexpected request'); })
     ${html.slice(html.indexOf('const ENERGY_DEFAULT_DRAIN='), html.indexOf('const DIVISION_MIN_OVR='))}
     ${['mergeEnergyObservations', 'fetchPooledEnergyModels', 'cacheEnergyModel', 'energyModelsReadyMessage',
       'loadEnergyModels', 'energyModelsPending', 'predictionFromEnergyObservations', 'modelPredictionFromEnergyModel',
-      'lowStartCountForEnergyModel', 'calculateEnergyProjection', 'energyUseFor', 'modelPredictionFor',
+      'lowStartCountForEnergyModel', 'energyRestRecoveryRateFor', 'calculateEnergyProjection', 'energyUseFor', 'modelPredictionFor',
       'energyProjectionStorageKey', 'loadEnergyProjectionCounts', 'saveEnergyProjectionCounts',
       'energyProjectionCountKey', 'storedEnergyProjectionCount', 'energyPoolReadyCount', 'updatePitchEnergyWarnings'].map(functionSource).join('\n')}
   `, context);
@@ -220,6 +220,21 @@ test('rest restores 65% of missing raw energy instead of draining, including at 
   assert.equal(projection.rows[2].matchStarts[0].energies[0], 9856);
   assert.equal(projection.final[0], 9445);
   assert.equal(projection.rows[0].end[1], 10000);
+});
+
+test('rest recovery falls to 55% for orange and 35% for red retirement notices', () => {
+  const { context } = harness();
+  const schedule = [{ day: 1, training: false, league: true, cup: true }];
+  const restMatches = { '1:cup': true };
+  const projection = context.calculateEnergyProjection([
+    { drain: 20, manualDrain: true, restMatches },
+    { drain: 20, manualDrain: true, retirementYears: 3, restMatches },
+    { drain: 20, manualDrain: true, retirementYears: 2, restMatches },
+    { drain: 20, manualDrain: true, retirementYears: 1, restMatches },
+  ], schedule);
+  const rest = projection.rows[0].matchStarts[1];
+  assert.deepEqual(Array.from(rest.uses, use => use.recoveryRaw), [1300, 1300, 1100, 700]);
+  assert.deepEqual(Array.from(rest.after), [9300, 9300, 9100, 8700]);
 });
 
 test('D7 and D9 support play/play, rest/play, play/rest and rest/rest in sequence', () => {

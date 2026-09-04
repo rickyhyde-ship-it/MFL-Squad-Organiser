@@ -2609,7 +2609,7 @@ button.substitute-card:not(.is-filled):focus-visible {
               <div class="energy-starter-controls" id="energyStarterControls"></div>
             </div>
             <div class="energy-table-heading">
-              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Match-start energy, rounded up for display. Use Rest team or individual Rest buttons to recover 65% of missing energy. Choose G1 and G2 separately; G1 recovery carries into G2.</span></div>
+              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Match-start energy, rounded up for display. Rest recovers 65% of missing energy for no notice/yellow, 55% for orange, and 35% for red. Choose G1 and G2 separately; G1 recovery carries into G2.</span></div>
               <div class="energy-legend"><span><i class="energy-dot safe"></i>&gt; 60%</span><span><i class="energy-dot danger"></i>60% or less</span><span><i class="energy-dot fallback"></i>Fallback used</span></div>
             </div>
             <div class="energy-table-shell" tabindex="0" aria-label="Scrollable daily starter energy table">
@@ -2649,7 +2649,7 @@ button.substitute-card:not(.is-filled):focus-visible {
             <div class="energy-lab-players" id="energyLabPlayers"></div>
             <button class="energy-lab-button energy-lab-button--quiet energy-lab-button--danger" type="button" id="energyLabClear" style="width:100%;margin-top:12px">Clear comparison</button>
           </div>
-          <div class="energy-lab-note">New players default to their registered position and an 89% rest limit. A rest recovers 65% of missing energy; the limit is checked before every match.</div>
+          <div class="energy-lab-note">New players default to their registered position and an 89% rest limit. Rest recovers 65% of missing energy for no notice/yellow, 55% for orange, and 35% for red; the limit is checked before every match.</div>
         </aside>
 
         <div class="energy-lab-stack">
@@ -3275,11 +3275,18 @@ function defaultEnergyDrainFor(player){
   return ENERGY_DEFAULT_DRAIN;
 }
 
+function energyRestRecoveryRateFor(starter){
+  const retirementYears=Number(starter?.retirementYears??starter?.profile?.retirement??starter?.player?.retireIn);
+  if(retirementYears===1)return 0.35;
+  if(retirementYears===2)return 0.55;
+  return ENERGY_REST_RECOVERY;
+}
+
 function getEnergyStarters(squad){
   return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>{
     const profile=energyProfileFor(entry);
     const key=energyPlayerKey(entry.slot,entry.index);
-    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:defaultEnergyDrainFor(entry.player),profile,modelKey:profile?energyModelKey(profile):null};
+    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:defaultEnergyDrainFor(entry.player),retirementYears:typeof projectedRetirementYears==='function'?projectedRetirementYears(entry.player?.retireIn):entry.player?.retireIn,profile,modelKey:profile?energyModelKey(profile):null};
   });
 }
 
@@ -3494,7 +3501,7 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule(),inte
       }
       const matchEnergies=energies.slice();
       const uses=energies.map((energy,index)=>resting[index]
-        ?{source:'rest',drainRaw:0,recoveryRaw:Math.round((ENERGY_MAX_RAW-energy)*ENERGY_REST_RECOVERY)}
+        ?{source:'rest',drainRaw:0,recoveryRaw:Math.round((ENERGY_MAX_RAW-energy)*energyRestRecoveryRateFor(starters[index]))}
         :energyUseFor(starters[index],energy));
       energies=energies.map((energy,index)=>resting[index]
         ?Math.min(ENERGY_MAX_RAW,energy+uses[index].recoveryRaw)
@@ -3698,7 +3705,8 @@ function renderEnergyPlanner(refreshControls=true){
         ?row.matchStarts.map(match=>{
           const resting=match.resting[index],entry=starters[index];
           const label=`Rest ${entry.player.name} on Day ${day.day}, G${match.match} (${match.type})`;
-          return`<div class="energy-match-option"><strong class="energy-match-value${resting?' is-resting':match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}"><em>G${match.match}</em>${formatEnergy(match.energies[index])}</strong><button type="button" class="energy-rest-toggle" id="energy-rest-${entry.index}-${day.day}-${match.type}" aria-label="${escAttr(label)}" aria-pressed="${resting}" title="${resting?'Click to play this match':'Rest to recover 65% of missing energy'}" onclick="toggleEnergyRest(${entry.index},${day.day},'${match.type}')"${viewerMode?' disabled':''}>${resting?'Resting':'Rest'}</button>${resting?`<small class="energy-rest-recovery">Recovers to ${formatEnergy(match.after[index])}</small>`:''}</div>`;
+          const recoveryPercent=Math.round(energyRestRecoveryRateFor(entry)*100);
+          return`<div class="energy-match-option"><strong class="energy-match-value${resting?' is-resting':match.energies[index]<=ENERGY_LOW_RAW?' is-low':''}"><em>G${match.match}</em>${formatEnergy(match.energies[index])}</strong><button type="button" class="energy-rest-toggle" id="energy-rest-${entry.index}-${day.day}-${match.type}" aria-label="${escAttr(label)}" aria-pressed="${resting}" title="${resting?'Click to play this match':`Rest to recover ${recoveryPercent}% of missing energy`}" onclick="toggleEnergyRest(${entry.index},${day.day},'${match.type}')"${viewerMode?' disabled':''}>${resting?'Resting':'Rest'}</button>${resting?`<small class="energy-rest-recovery">Recovers to ${formatEnergy(match.after[index])}</small>`:''}</div>`;
         }).join('')
         :`<strong class="energy-match-value${row.afterTraining[index]<=ENERGY_LOW_RAW?' is-low':''}">${formatEnergy(row.afterTraining[index])}</strong>`;
       const startLabel=row.matchStarts.length?`ends ${formatEnergy(energy)}`:'after training';

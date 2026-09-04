@@ -30,7 +30,7 @@ The training intensity control beside the schedule toggle applies once before ma
 
 Calculations use raw energy and round the result to whole raw units. The daily table, pitch warnings and player-pool projections all use the selected intensity. The energy scan stores separate counts for all three intensities and both schedules; existing Low counts remain valid.
 
-Team and individual rest choices are preserved when intensity changes. Rest restores 65% of the energy missing at that match's start, with no match drain. On double-match days, training happens once, followed by G1 and G2 in order.
+Team and individual rest choices are preserved when intensity changes. Rest restores 65% of the energy missing at that match's start for players with no retirement notice or a yellow (3-season) notice, 55% for orange (2 seasons), and 35% for red (1 season), with no match drain. On double-match days, training happens once, followed by G1 and G2 in order.
 
 ## Verification and publishing
 
