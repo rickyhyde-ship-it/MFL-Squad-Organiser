@@ -329,6 +329,7 @@ body.viewer-mode .pitch-slot { cursor: default; }
 }
 </style>
   <link rel="stylesheet" href="./hub-tool-frame.css?v=2.0.2">
+  <link rel="stylesheet" href="./energy-lab.css?v=1.0.0">
 <style>
 /* ==============================================================
    ORBITAL TOUCHLINE / SQUAD COMMAND
@@ -2460,6 +2461,7 @@ button.substitute-card:not(.is-filled):focus-visible {
   </div>
   <div class="upload-or">— or —</div>
   <button id="btnLoadSave" onclick="document.getElementById('loadSaveInput').click()">Load Saved Session</button>
+  <button class="energy-lab-entry" type="button" id="btnOpenEnergyLab">Open Energy Lab without a wallet</button>
   <input type="file" id="loadSaveInput" accept=".json" style="display:none">
   <div style="margin-top:30px;color:var(--text-muted);font-size:11px;">Built by <span style="color:var(--accent)">ricky_hyde</span> on Discord for feedback &amp; suggestions</div>
 </div>
@@ -2467,6 +2469,10 @@ button.substitute-card:not(.is-filled):focus-visible {
 <div id="appScreen">
   <div class="app-header">
     <div class="app-logo">MFL Squad Organiser</div>
+    <nav class="app-page-nav" aria-label="Squad organiser pages" role="tablist">
+      <button class="app-page-tab" type="button" role="tab" data-page="squad" aria-selected="true">Squad builder</button>
+      <button class="app-page-tab" type="button" role="tab" data-page="energy" aria-selected="false" tabindex="-1">Energy lab</button>
+    </nav>
     <div class="header-division-counts" id="headerDivisionCounts" aria-label="Club counts by division"></div>
     <div class="viewer-live-status" id="viewerLiveStatus" role="status" aria-live="polite"></div>
     <div class="header-actions">
@@ -2476,7 +2482,7 @@ button.substitute-card:not(.is-filled):focus-visible {
     </div>
   </div>
   <div class="pool-summary" id="poolSummary"></div>
-  <div class="main-layout">
+  <div class="main-layout" id="squadWorkspace">
     <div class="squad-nav">
       <div class="squad-nav-header"><div class="squad-nav-title">Owned Clubs</div><button class="btn-add-squad" onclick="addSquad()" title="Add custom squad" aria-label="Add custom squad">+</button></div>
       <div class="club-toolbar">
@@ -2593,6 +2599,63 @@ button.substitute-card:not(.is-filled):focus-visible {
       </div>
     </div>
   </div>
+  <main class="energy-lab-page" id="energyLabPage" hidden>
+    <div class="energy-lab-shell">
+      <section class="energy-lab-hero" aria-labelledby="energyLabTitle">
+        <div>
+          <div class="energy-lab-eyebrow">Page 02 · Season simulator</div>
+          <h1 class="energy-lab-title" id="energyLabTitle">Keep every player <em>match-ready.</em></h1>
+          <p class="energy-lab-intro">Compare one or many player IDs on the same daily energy chart. Set how they start, where they play, how hard they train, and the lowest energy you will accept at kick-off. The planner automatically rests anyone projected below their personal limit.</p>
+        </div>
+        <div class="energy-lab-hero-meta" id="energyLabHeroMeta" aria-label="Projection summary"></div>
+      </section>
+
+      <div class="energy-lab-grid">
+        <aside class="energy-lab-panel" aria-labelledby="energyLabSetupTitle">
+          <div class="energy-lab-panel-head">
+            <div><span class="energy-lab-section-tag">01 / Roster</span><h2 id="energyLabSetupTitle">Build the comparison</h2><p>Paste IDs with spaces, commas, or new lines. You can fine-tune every player after adding them.</p></div>
+          </div>
+          <div class="energy-lab-panel-body">
+            <div class="energy-lab-bulk">
+              <label class="energy-lab-field" for="energyLabIds"><span>Player IDs</span><textarea id="energyLabIds" placeholder="12345, 67890&#10;24680" autocomplete="off"></textarea></label>
+              <div class="energy-lab-form-row">
+                <label class="energy-lab-field" for="energyLabDefaultPosition"><span>Starting position</span><select id="energyLabDefaultPosition"></select></label>
+                <div class="energy-lab-field"><span>Projection</span><button class="energy-lab-button energy-lab-button--primary" type="button" id="energyLabAdd">Add to projection</button></div>
+              </div>
+              <div class="energy-lab-form-status" id="energyLabFormStatus" role="status" aria-live="polite"></div>
+            </div>
+            <div class="energy-lab-players" id="energyLabPlayers"></div>
+            <button class="energy-lab-button energy-lab-button--quiet energy-lab-button--danger" type="button" id="energyLabClear" style="width:100%;margin-top:12px">Clear comparison</button>
+          </div>
+          <div class="energy-lab-note">A rest recovers 65% of missing energy. The threshold is checked before each match, including both games on double-match days.</div>
+        </aside>
+
+        <div class="energy-lab-stack">
+          <section class="energy-lab-panel" aria-labelledby="energyLabChartHeading">
+            <div class="energy-lab-panel-head">
+              <div><span class="energy-lab-section-tag">02 / Trend</span><h2 id="energyLabChartHeading">All-player energy</h2><p>Daily closing energy across the season. Horizontal dashed guides are personal start limits; diamonds mark automatic rests.</p></div>
+              <div class="energy-lab-toolbar">
+                <button class="energy-lab-button energy-lab-button--quiet" type="button" id="energyLabScheduleToggle">Toggle 28 / 35 matches</button>
+                <div class="energy-lab-export">
+                  <label for="energyLabExportMode"><span class="energy-lab-export-label">PNG content</span><select class="energy-lab-export-select" id="energyLabExportMode"><option value="graph">Graph only</option><option value="table">Daily table only</option><option value="both" selected>Graph + table</option></select></label>
+                  <button class="energy-lab-button" type="button" id="energyLabExportButton" disabled>Export PNG</button>
+                </div>
+              </div>
+            </div>
+            <div class="energy-lab-chart-wrap" id="energyLabChartWrap"></div>
+            <div class="energy-lab-legend" id="energyLabLegend" aria-label="Player chart legend"></div>
+            <div class="energy-lab-note" id="energyLabModelStatus" role="status" aria-live="polite">Add players to load historic energy evidence.</div>
+          </section>
+
+          <section class="energy-lab-panel" aria-labelledby="energyLabTableHeading">
+            <div class="energy-lab-panel-head"><div><span class="energy-lab-section-tag">03 / Detail</span><h2 id="energyLabTableHeading">Daily running energy</h2><p>Exact match-start decisions and the closing energy carried into the next day.</p></div></div>
+            <div class="energy-lab-table-wrap" tabindex="0" aria-label="Scrollable daily running energy table"><table class="energy-lab-table" id="energyLabTable"></table></div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div class="energy-lab-toast" id="energyLabToast" role="status" aria-live="polite"></div>
+  </main>
 </div>
 
 <div class="modal-overlay" id="addPlayerModal">
@@ -4750,6 +4813,7 @@ document.getElementById('importInput').addEventListener('change',e=>{const f=e.t
 function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 if(viewerMode)startDelegationSquadViewer();
 </script>
+<script src="./energy-lab.js?v=1.0.0"></script>
 <script src="./tool-bridge.js?v=2.0.2"></script>
 <script src="./tool-a11y.js?v=2.0.2"></script>
 </body>
