@@ -2115,6 +2115,50 @@ button.substitute-card:not(.is-filled):focus-visible {
   white-space: nowrap;
 }
 
+.energy-planner-export-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.energy-export-button {
+  min-height: 31px;
+  padding: 6px 11px;
+  border: 1px solid rgba(72, 245, 154, .42);
+  border-radius: 7px 7px 7px 2px;
+  background: rgba(72, 245, 154, .09);
+  color: var(--green);
+  font: 700 9px 'JetBrains Mono', monospace;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+
+.energy-export-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--green);
+  background: rgba(72, 245, 154, .15);
+  box-shadow: 0 8px 20px rgba(72, 245, 154, .1);
+}
+
+.energy-export-button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.energy-export-button:disabled { cursor: not-allowed; opacity: .42; }
+
+.energy-export-status {
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  position: absolute;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .energy-planner-empty {
   padding: 30px 20px;
   color: var(--text-muted);
@@ -2574,8 +2618,12 @@ button.substitute-card:not(.is-filled):focus-visible {
                 </div>
               </div>
               </div>
-              <div class="energy-planner-badges" aria-label="Schedule summary">
-                <span id="energyMatchCountBadge">35 matches</span><span>28 training days</span><span>15% floor</span>
+              <div class="energy-planner-export-row">
+                <div class="energy-planner-badges" aria-label="Schedule summary">
+                  <span id="energyMatchCountBadge">35 matches</span><span>28 training days</span><span>15% floor</span>
+                </div>
+                <button type="button" class="energy-export-button" id="startingXiEnergyExportButton" onclick="exportStartingXiEnergyPng()" disabled>Export all as PNG</button>
+                <span class="energy-export-status" id="startingXiEnergyExportStatus" role="status" aria-live="polite"></span>
               </div>
             </div>
           </div>
@@ -3628,7 +3676,7 @@ function renderEnergyPlayerIdentity(entry,source){
 }
 
 function renderEnergyPlanner(refreshControls=true){
-  const empty=document.getElementById('energyPlannerEmpty'),content=document.getElementById('energyPlannerContent'),summary=document.getElementById('energySummary'),controls=document.getElementById('energyStarterControls'),table=document.getElementById('energyTable'),modelStatus=document.getElementById('energyModelStatus');
+  const empty=document.getElementById('energyPlannerEmpty'),content=document.getElementById('energyPlannerContent'),summary=document.getElementById('energySummary'),controls=document.getElementById('energyStarterControls'),table=document.getElementById('energyTable'),modelStatus=document.getElementById('energyModelStatus'),exportButton=document.getElementById('startingXiEnergyExportButton');
   if(!empty||!content||!summary||!controls||!table)return;
   const schedule=activeEnergySchedule();
   const scheduleToggle=document.getElementById('energyScheduleToggle'),matchCountBadge=document.getElementById('energyMatchCountBadge');
@@ -3643,6 +3691,7 @@ function renderEnergyPlanner(refreshControls=true){
   const hasIndividualTraining=starters.some(entry=>entry.trainingIntensity!==energyTrainingIntensity);
   if(trainingDescription)trainingDescription.textContent=`${ENERGY_TRAINING_DESCRIPTIONS[energyTrainingIntensity]}${hasIndividualTraining?' Individual player settings override the team selection where shown.':''}`;
   if(!squad||!starters.length){
+    if(exportButton)exportButton.disabled=true;
     updatePitchEnergyWarnings([],null);
     empty.hidden=false;
     content.hidden=true;
@@ -3654,6 +3703,7 @@ function renderEnergyPlanner(refreshControls=true){
   loadEnergyModels(starters);
   if(modelStatus)modelStatus.textContent=energyModelMessage;
   if(energyModelsPending(starters)){
+    if(exportButton)exportButton.disabled=true;
     updatePitchEnergyWarnings(starters,null);
     summary.innerHTML=`<div class="energy-summary-card"><span class="energy-summary-label">Historic evidence</span><span class="energy-summary-value">Loading…</span><span class="energy-summary-detail">The projection will start only after matching data is checked.</span></div>`;
     if(refreshControls)controls.innerHTML=starters.map(entry=>`<div class="energy-player-control">${renderEnergyPlayerIdentity(entry,'Checking exact historic matches…')}${renderEnergyPlayerTrainingOptions(entry)}</div>`).join('');
@@ -3661,6 +3711,7 @@ function renderEnergyPlanner(refreshControls=true){
     return;
   }
   const projection=calculateEnergyProjection(starters,schedule);
+  if(exportButton)exportButton.disabled=exportButton.dataset.busy==='true';
   updatePitchEnergyWarnings(starters,projection);
   const finalMin=projection.final.length?Math.min(...projection.final):ENERGY_MAX_RAW;
   const finalMax=projection.final.length?Math.max(...projection.final):ENERGY_MAX_RAW;
@@ -4814,6 +4865,7 @@ function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;
 if(viewerMode)startDelegationSquadViewer();
 </script>
 <script src="./energy-lab.js?v=1.1.0"></script>
+<script src="./starting-xi-export.js?v=1.0.0"></script>
 <script src="./tool-bridge.js?v=2.0.2"></script>
 <script src="./tool-a11y.js?v=2.0.2"></script>
 </body>
