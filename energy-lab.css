@@ -126,6 +126,9 @@
 .energy-lab-hero-stat span { display: block; color: var(--text-muted); font: 700 8px 'JetBrains Mono', monospace; letter-spacing: .09em; text-transform: uppercase; }
 .energy-lab-hero-stat strong { display: block; margin-top: 7px; color: #eef3f8; font: 700 22px 'JetBrains Mono', monospace; }
 .energy-lab-hero-stat small { display: block; margin-top: 3px; color: #778a9e; font-size: 9px; }
+.energy-lab-hero-stat:nth-child(3) { border-color: rgba(185,118,255,.7); background: linear-gradient(135deg, rgba(168,85,247,.22), rgba(8,13,20,.72)); box-shadow: inset 3px 0 0 #b976ff; }
+.energy-lab-hero-stat:nth-child(3) span { color: #d9c1ff; }
+.energy-lab-hero-stat:nth-child(3) strong { color: #fff; font-size: 28px; }
 
 .energy-lab-grid { display: grid; grid-template-columns: minmax(320px, 390px) minmax(0, 1fr); gap: 18px; align-items: start; }
 .energy-lab-stack { display: grid; gap: 18px; }
@@ -209,6 +212,8 @@
 .energy-lab-player-swatch { width: 42px; height: 54px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--player-color) 58%, #253142); border-radius: 5px; color: var(--player-color); background: color-mix(in srgb, var(--player-color) 11%, #0c131c); font: 800 11px 'JetBrains Mono', monospace; }
 .energy-lab-player-name { overflow: hidden; color: #f0f4f8; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .energy-lab-player-meta { margin-top: 3px; color: #74869a; font: 600 9px 'JetBrains Mono', monospace; }
+.energy-lab-player-attributes { margin-top: 5px; color: #a9b7c6; font: 600 8px 'JetBrains Mono', monospace; line-height: 1.45; }
+.energy-lab-player-retirement { margin-top: 3px; color: #a98bd0; font: 600 8px 'JetBrains Mono', monospace; }
 .energy-lab-player-controls { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr .9fr .9fr; gap: 7px; margin-top: 2px; }
 .energy-lab-player-controls .energy-lab-field > span { font-size: 8px; }
 .energy-lab-player-controls .energy-lab-field input,
@@ -225,7 +230,10 @@
 .energy-lab-chart-wrap { padding: 8px 10px 4px; }
 .energy-lab-chart { display: block; width: 100%; min-height: 390px; overflow: visible; }
 .energy-lab-chart .grid-line { stroke: #263342; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.energy-lab-chart .grid-line.is-minor { opacity: .45; }
+.energy-lab-chart .grid-line.is-day { opacity: .28; }
 .energy-lab-chart .axis-label { fill: #718397; font: 600 10px 'JetBrains Mono', monospace; }
+.energy-lab-chart .axis-label--day { font-size: 7px; }
 .energy-lab-chart .threshold-line { opacity: .3; stroke-width: 1; stroke-dasharray: 5 6; vector-effect: non-scaling-stroke; }
 .energy-lab-chart .player-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 5px rgba(0,0,0,.32)); }
 .energy-lab-chart .player-point { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
@@ -239,16 +247,18 @@
 .energy-lab-chart-empty { min-height: 390px; display: grid; place-items: center; padding: 30px; color: #718397; font-size: 12px; text-align: center; }
 
 .energy-lab-table-wrap { max-height: 620px; overflow: auto; scrollbar-gutter: stable; }
-.energy-lab-table { width: max(100%, 820px); border-collapse: separate; border-spacing: 0; font-size: 10px; }
+.energy-lab-table-pair { display: grid; grid-template-columns: repeat(2, minmax(400px, 1fr)); gap: 12px; min-width: 812px; padding: 12px; }
+.energy-lab-table { width: 100%; border: 1px solid #2b3848; border-collapse: separate; border-spacing: 0; border-radius: 7px 7px 7px 2px; overflow: hidden; font-size: 10px; }
+.energy-lab-table caption { padding: 8px 11px; color: #c9a8ff; background: #0d141d; font: 700 9px 'JetBrains Mono', monospace; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
 .energy-lab-table th,
-.energy-lab-table td { min-width: 145px; padding: 9px 11px; border-right: 1px solid rgba(52,66,84,.62); border-bottom: 1px solid rgba(52,66,84,.62); text-align: left; vertical-align: top; }
+.energy-lab-table td { min-width: 105px; padding: 8px 9px; border-right: 1px solid rgba(52,66,84,.62); border-bottom: 1px solid rgba(52,66,84,.62); text-align: left; vertical-align: top; }
 .energy-lab-table thead th { position: sticky; top: 0; z-index: 4; color: #c8d2dc; background: #151d28; font: 700 9px 'JetBrains Mono', monospace; letter-spacing: .05em; }
 .energy-lab-table th:first-child,
-.energy-lab-table td:first-child { position: sticky; left: 0; z-index: 2; min-width: 70px; width: 70px; background: #111820; }
+.energy-lab-table td:first-child { min-width: 48px; width: 48px; background: #111820; }
 .energy-lab-table th:nth-child(2),
-.energy-lab-table td:nth-child(2) { position: sticky; left: 70px; z-index: 2; min-width: 150px; width: 150px; background: #111820; }
+.energy-lab-table td:nth-child(2) { min-width: 100px; width: 100px; background: #111820; }
 .energy-lab-table thead th:first-child,
-.energy-lab-table thead th:nth-child(2) { z-index: 6; background: #151d28; }
+.energy-lab-table thead th:nth-child(2) { background: #151d28; }
 .energy-lab-table tbody tr:hover td { background-color: rgba(168,85,247,.055); }
 .energy-lab-table tbody tr:hover td:first-child,
 .energy-lab-table tbody tr:hover td:nth-child(2) { background-color: #171d29; }
@@ -288,6 +298,7 @@ body.energy-lab-active #energyLabPage { display: block !important; }
   .energy-lab-toolbar { width: 100%; justify-content: stretch; }
   .energy-lab-export { width: 100%; grid-template-columns: minmax(0, 1fr) auto; }
   .energy-lab-chart { min-height: 320px; }
+  .energy-lab-table-pair { grid-template-columns: repeat(2, minmax(380px, 1fr)); min-width: 772px; }
 }
 
 @media (max-width: 480px) {

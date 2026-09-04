@@ -329,7 +329,7 @@ body.viewer-mode .pitch-slot { cursor: default; }
 }
 </style>
   <link rel="stylesheet" href="./hub-tool-frame.css?v=2.0.2">
-  <link rel="stylesheet" href="./energy-lab.css?v=1.0.0">
+  <link rel="stylesheet" href="./energy-lab.css?v=1.1.0">
 <style>
 /* ==============================================================
    ORBITAL TOUCHLINE / SQUAD COMMAND
@@ -2605,7 +2605,7 @@ button.substitute-card:not(.is-filled):focus-visible {
         <div>
           <div class="energy-lab-eyebrow">Page 02 · Season simulator</div>
           <h1 class="energy-lab-title" id="energyLabTitle">Keep every player <em>match-ready.</em></h1>
-          <p class="energy-lab-intro">Compare one or many player IDs on the same daily energy chart. Set how they start, where they play, how hard they train, and the lowest energy you will accept at kick-off. The planner automatically rests anyone projected below their personal limit.</p>
+          <p class="energy-lab-intro">Compare one or many player IDs on the same daily energy chart. Set how they start, where they play, how hard they train, and the lowest energy you will accept at kick-off. The planner automatically rests anyone projected at or below their personal limit.</p>
         </div>
         <div class="energy-lab-hero-meta" id="energyLabHeroMeta" aria-label="Projection summary"></div>
       </section>
@@ -2619,7 +2619,7 @@ button.substitute-card:not(.is-filled):focus-visible {
             <div class="energy-lab-bulk">
               <label class="energy-lab-field" for="energyLabIds"><span>Player IDs</span><textarea id="energyLabIds" placeholder="12345, 67890&#10;24680" autocomplete="off"></textarea></label>
               <div class="energy-lab-form-row">
-                <label class="energy-lab-field" for="energyLabDefaultPosition"><span>Starting position</span><select id="energyLabDefaultPosition"></select></label>
+                <label class="energy-lab-field" for="energyLabDefaultPosition"><span>Position override</span><select id="energyLabDefaultPosition"></select></label>
                 <div class="energy-lab-field"><span>Projection</span><button class="energy-lab-button energy-lab-button--primary" type="button" id="energyLabAdd">Add to projection</button></div>
               </div>
               <div class="energy-lab-form-status" id="energyLabFormStatus" role="status" aria-live="polite"></div>
@@ -2627,7 +2627,7 @@ button.substitute-card:not(.is-filled):focus-visible {
             <div class="energy-lab-players" id="energyLabPlayers"></div>
             <button class="energy-lab-button energy-lab-button--quiet energy-lab-button--danger" type="button" id="energyLabClear" style="width:100%;margin-top:12px">Clear comparison</button>
           </div>
-          <div class="energy-lab-note">A rest recovers 65% of missing energy. The threshold is checked before each match, including both games on double-match days.</div>
+          <div class="energy-lab-note">New players default to their registered position and an 89% rest limit. A rest recovers 65% of missing energy; the limit is checked before every match.</div>
         </aside>
 
         <div class="energy-lab-stack">
@@ -2649,7 +2649,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
           <section class="energy-lab-panel" aria-labelledby="energyLabTableHeading">
             <div class="energy-lab-panel-head"><div><span class="energy-lab-section-tag">03 / Detail</span><h2 id="energyLabTableHeading">Daily running energy</h2><p>Exact match-start decisions and the closing energy carried into the next day.</p></div></div>
-            <div class="energy-lab-table-wrap" tabindex="0" aria-label="Scrollable daily running energy table"><table class="energy-lab-table" id="energyLabTable"></table></div>
+            <div class="energy-lab-table-wrap" tabindex="0" aria-label="Scrollable daily running energy tables"><div class="energy-lab-table-pair" id="energyLabTablePair"></div></div>
           </section>
         </div>
       </div>
@@ -4813,7 +4813,7 @@ document.getElementById('importInput').addEventListener('change',e=>{const f=e.t
 function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 if(viewerMode)startDelegationSquadViewer();
 </script>
-<script src="./energy-lab.js?v=1.0.0"></script>
+<script src="./energy-lab.js?v=1.1.0"></script>
 <script src="./tool-bridge.js?v=2.0.2"></script>
 <script src="./tool-a11y.js?v=2.0.2"></script>
 </body>

@@ -23,7 +23,7 @@ function player(overrides = {}) {
   return {
     startingEnergy: 100,
     trainingIntensity: 'medium',
-    threshold: 60,
+    threshold: 89,
     starter: { drainRaw: 2500 },
     ...overrides,
   };
@@ -38,20 +38,36 @@ test('Energy Lab keeps every player in one projection while honoring individual 
   assert.deepEqual(projection.rows[0].afterTraining, [10000, 8400]);
   assert.deepEqual(projection.final, [7500, 7400]);
   assert.equal(projection.rows[0].matches[0].outcomes.length, 2);
+  assert.equal(projection.gamesPlayed, 2);
+  assert.deepEqual(projection.gamesPlayedByPlayer, [1, 1]);
 });
 
-test('threshold rests are strict: equal plays, lower rests and recovers 65% of missing energy', () => {
+test('threshold rests are inclusive: equal and lower rest, higher plays', () => {
   const projection = calculateProjection(
-    [player({ startingEnergy: 60, threshold: 60 }), player({ startingEnergy: 59, threshold: 60 })],
+    [player({ startingEnergy: 60, threshold: 60 }), player({ startingEnergy: 59, threshold: 60 }), player({ startingEnergy: 61, threshold: 60 })],
     [{ day: 1, training: false, league: true, cup: false }],
     hooks,
   );
   const outcomes = projection.rows[0].matches[0].outcomes;
-  assert.equal(outcomes[0].resting, false);
+  assert.equal(outcomes[0].resting, true);
   assert.equal(outcomes[1].resting, true);
-  assert.equal(projection.final[0], 3500);
+  assert.equal(outcomes[2].resting, false);
+  assert.equal(projection.final[0], 8600);
   assert.equal(projection.final[1], 8565);
-  assert.equal(projection.autoRests, 1);
+  assert.equal(projection.final[2], 3600);
+  assert.equal(projection.autoRests, 2);
+  assert.equal(projection.gamesPlayed, 1);
+  assert.deepEqual(projection.gamesPlayedByPlayer, [0, 0, 1]);
+});
+
+test('missing thresholds use the 89% default rest limit', () => {
+  const projection = calculateProjection(
+    [player({ startingEnergy: 89, threshold: undefined })],
+    [{ day: 1, training: false, league: true, cup: false }],
+    hooks,
+  );
+  assert.equal(projection.rows[0].matches[0].outcomes[0].resting, true);
+  assert.equal(projection.gamesPlayed, 0);
 });
 
 test('double-match days re-check the threshold after the first game', () => {
