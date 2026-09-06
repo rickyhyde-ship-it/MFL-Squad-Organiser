@@ -222,6 +222,7 @@ body {
 .filter-select:focus { border-color: var(--accent); }
 .filter-small { width: 60px; }
 .filter-label { font-size: 11px; color: var(--text-muted); }
+.career-season-filter input { accent-color:var(--accent); }
 .retirement-filters { display:inline-flex; align-items:center; gap:4px; padding:4px 6px; border:1px solid var(--border); border-radius:7px; background:rgba(10,14,19,.26); }
 .retirement-filter { display:inline-flex; align-items:center; gap:4px; min-height:24px; padding:2px 5px; border-radius:4px; color:var(--text-secondary); font-size:10px; white-space:nowrap; cursor:pointer; transition:background .15s,color .15s; }
 .retirement-filter:hover { background:var(--bg-hover); color:var(--text-primary); }
@@ -2690,6 +2691,7 @@ button.substitute-card:not(.is-filled):focus-visible {
       <span class="filter-range"><span class="filter-label">Age</span><input class="filter-input filter-small" id="filterAgeMin" type="number" placeholder="Min" aria-label="Minimum age" oninput="applyFilters()"><input class="filter-input filter-small" id="filterAgeMax" type="number" placeholder="Max" aria-label="Maximum age" oninput="applyFilters()"></span>
       <span class="filter-range"><span class="filter-label">Seasons</span><input class="filter-input filter-small" id="filterSeasonsMin" type="number" min="1" step="1" placeholder="Min" aria-label="Minimum seasons in game" oninput="applyFilters()"><input class="filter-input filter-small" id="filterSeasonsMax" type="number" min="1" step="1" placeholder="Max" aria-label="Maximum seasons in game" oninput="applyFilters()"></span>
       <span class="filter-range"><span class="filter-label">Progression</span><input class="filter-input filter-small" id="filterProgressionMin" type="number" step="1" placeholder="Min" aria-label="Minimum all-time OVR progression" oninput="applyFilters()"><input class="filter-input filter-small" id="filterProgressionMax" type="number" step="1" placeholder="Max" aria-label="Maximum all-time OVR progression" oninput="applyFilters()"></span>
+      <div class="retirement-filters" role="group" aria-label="Include early-season players" title="Include selected seasons alongside any season and progression range matches. Other filters still apply."><span class="filter-label">Include</span><label class="retirement-filter career-season-filter"><input id="filterFirstSeason" type="checkbox" onchange="applyFilters()">1st season</label><label class="retirement-filter career-season-filter"><input id="filterSecondSeason" type="checkbox" onchange="applyFilters()">2nd season</label></div>
       <div class="retirement-filters" role="group" aria-label="Exclude players by retirement notice"><span class="filter-label">Exclude</span><label class="retirement-filter retirement-filter--none"><input id="filterRetirementNone" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>No notice</label><label class="retirement-filter retirement-filter--yellow"><input id="filterRetirementYellow" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Yellow</label><label class="retirement-filter retirement-filter--orange"><input id="filterRetirementOrange" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Orange</label><label class="retirement-filter retirement-filter--red"><input id="filterRetirementRed" type="checkbox" onchange="applyFilters()"><span class="retirement-filter__dot" aria-hidden="true"></span>Red</label></div>
       <button type="button" class="filter-clear" onclick="clearPlayerFilters()">Clear all filters</button>
       <span id="filterCount" role="status" aria-live="polite" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);margin-left:8px;white-space:nowrap"></span>
@@ -4421,7 +4423,7 @@ function clearPlayerFilters(){
   ['filterName','filterOvrMin','filterOvrMax','filterAgeMin','filterAgeMax','filterSeasonsMin','filterSeasonsMax','filterProgressionMin','filterProgressionMax'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('filterUpgradeThreshold').value=ALT_UPGRADE_DEFAULT_THRESHOLD;
   document.getElementById('filterPos').value='';
-  ['filterRetirementNone','filterRetirementYellow','filterRetirementOrange','filterRetirementRed'].forEach(id=>{document.getElementById(id).checked=false;});
+  ['filterFirstSeason','filterSecondSeason','filterRetirementNone','filterRetirementYellow','filterRetirementOrange','filterRetirementRed'].forEach(id=>{document.getElementById(id).checked=false;});
   upgradeFilterOn=false;
   updateUpgradeFilterButton();
   applyFilters();
@@ -4527,8 +4529,25 @@ function playerCanBeSelectedForTarget(player,squad,target){
   return !squads.some(item=>['starters','backups','substitutes'].some(section=>sectionHasPlayer(item,section,id)));
 }
 
+function matchesCareerFilters(player,seasonsMin,seasonsMax,progressionMin,progressionMax,firstSeason,secondSeason){
+  const seasons=projectedPlayerSeasons(player);
+  const selectedSeason=(firstSeason&&seasons===1)||(secondSeason&&seasons===2);
+  if(selectedSeason)return true;
+  const hasRanges=seasonsMin!==null||seasonsMax!==null||progressionMin!==null||progressionMax!==null;
+  if(!hasRanges)return !firstSeason&&!secondSeason;
+  if(seasonsMin!==null||seasonsMax!==null){
+    if(seasons===null||(seasonsMin!==null&&seasons<seasonsMin)||(seasonsMax!==null&&seasons>seasonsMax))return false;
+  }
+  if(progressionMin!==null||progressionMax!==null){
+    const progression=playerProgression(player);
+    if(progression===null||(progressionMin!==null&&progression<progressionMin)||(progressionMax!==null&&progression>progressionMax))return false;
+  }
+  return true;
+}
+
 function applyFilters(){
   const nf=document.getElementById('filterName').value.toLowerCase(),pf=document.getElementById('filterPos').value,oMin=readOptionalNumber('filterOvrMin')??0,oMax=readOptionalNumber('filterOvrMax')??99,aMin=readOptionalNumber('filterAgeMin')??0,aMax=readOptionalNumber('filterAgeMax')??99,seasonsMin=readOptionalNumber('filterSeasonsMin'),seasonsMax=readOptionalNumber('filterSeasonsMax'),progressionMin=readOptionalNumber('filterProgressionMin'),progressionMax=readOptionalNumber('filterProgressionMax');
+  const firstSeason=document.getElementById('filterFirstSeason').checked,secondSeason=document.getElementById('filterSecondSeason').checked;
   const upgradeThreshold=altUpgradeThresholdPercent();
   const excludedRetirementNotices=new Set([['none','filterRetirementNone'],['yellow','filterRetirementYellow'],['orange','filterRetirementOrange'],['red','filterRetirementRed']].filter(([,id])=>document.getElementById(id).checked).map(([notice])=>notice));
   const sq=activeSquad();
@@ -4541,8 +4560,7 @@ function applyFilters(){
     if(pf&&!meetsPositionThreshold(p,pf,POSITION_FILTER_THRESHOLD))return false;
     if(p.ovr<oMin||p.ovr>oMax)return false;
     if(p.age<aMin||p.age>aMax)return false;
-    if(seasonsMin!==null||seasonsMax!==null){const seasons=projectedPlayerSeasons(p);if(seasons===null||(seasonsMin!==null&&seasons<seasonsMin)||(seasonsMax!==null&&seasons>seasonsMax))return false;}
-    if(progressionMin!==null||progressionMax!==null){const progression=playerProgression(p);if(progression===null||(progressionMin!==null&&progression<progressionMin)||(progressionMax!==null&&progression>progressionMax))return false;}
+    if(!matchesCareerFilters(p,seasonsMin,seasonsMax,progressionMin,progressionMax,firstSeason,secondSeason))return false;
     if(excludedRetirementNotices.has(retirementNoticeLevel(p)))return false;
     if(upgradeFilterOn){
       const registeredPositions=p.metadata?.positions||String(p.positions||'').split(',').map(pos=>pos.trim()).filter(Boolean);
