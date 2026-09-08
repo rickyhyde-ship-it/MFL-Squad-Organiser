@@ -93,19 +93,19 @@ body {
 .pool-item-label { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-secondary); }
 .pool-item-count { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: var(--text-primary); min-width: 20px; text-align: center; }
 
-.career-scan { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:12px 18px; align-items:center; margin-bottom:16px; padding:13px 14px; border:1px solid rgba(58,242,75,.2); border-radius:8px 8px 8px 2px; background:linear-gradient(100deg,rgba(58,242,75,.065),rgba(17,24,32,.86) 48%); }
+.pool-summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; }
+.pool-counts { flex:1 1 auto; min-width:0; overflow-x:auto; }
+.pool-scan-controls { display:flex; flex:0 1 auto; flex-wrap:wrap; gap:10px; margin-left:auto; }
+.career-scan { display:grid; align-content:center; gap:5px; min-width:0; max-width:260px; }
 .career-scan[hidden] { display:none; }
-.career-scan__title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; }
-.career-scan__optional { padding:2px 6px; border:1px solid var(--border-light); border-radius:999px; color:var(--text-muted); font:700 8px 'JetBrains Mono',monospace; text-transform:uppercase; }
-.career-scan__warning { margin-top:4px; color:var(--text-secondary); font-size:11px; line-height:1.45; }
-.career-scan__actions { display:flex; gap:8px; }
+.career-scan__actions { display:flex; flex-wrap:wrap; gap:4px; }
+.pool-scan-controls .btn { min-height:32px; padding:5px 10px; font-size:11px; white-space:nowrap; }
 .career-scan__actions [hidden] { display:none; }
-.career-scan__progress { grid-column:1/-1; display:grid; grid-template-columns:minmax(160px,1fr) auto auto; gap:10px; align-items:center; }
-.career-scan__track { height:7px; overflow:hidden; border:1px solid var(--border); border-radius:999px; background:rgba(1,8,13,.72); }
+.career-scan__progress { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 6px; align-items:center; }
+.career-scan__track { grid-column:1/-1; height:3px; overflow:hidden; border-radius:999px; background:rgba(1,8,13,.72); }
 .career-scan__fill { width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#27c97d,#48f59a); box-shadow:0 0 14px rgba(72,245,154,.32); transition:width .25s ease; }
-.career-scan__status,.career-scan__eta { color:var(--text-muted); font:600 10px 'JetBrains Mono',monospace; white-space:nowrap; }
+.career-scan__status,.career-scan__eta { color:var(--text-muted); font:600 8px 'JetBrains Mono',monospace; }
 .career-scan__eta { color:#a8f5cd; }
-.energy-pool-scan { border-color:rgba(168,85,247,.26); background:linear-gradient(100deg,rgba(168,85,247,.075),rgba(17,24,32,.86) 48%); }
 .energy-pool-scan .career-scan__fill { background:linear-gradient(90deg,#8b5cf6,#c084fc); box-shadow:0 0 14px rgba(168,85,247,.35); }
 .energy-pool-scan .career-scan__eta { color:#dec3ff; }
 
@@ -1759,7 +1759,8 @@ button.substitute-card:not(.is-filled):focus-visible {
     padding: 14px 12px 28px;
   }
 
-  .career-scan { grid-template-columns:1fr; }
+  .pool-scan-controls { width:100%; margin-left:0; }
+  .career-scan { flex:1 1 150px; max-width:none; grid-template-columns:1fr; }
   .career-scan__actions { width:100%; }
   .career-scan__actions .btn { flex:1; }
   .career-scan__progress { grid-template-columns:1fr auto; }
@@ -2500,23 +2501,10 @@ button.substitute-card:not(.is-filled):focus-visible {
       <button class="btn" onclick="resetAll()">Reset</button>
     </div>
   </div>
-  <div class="pool-summary" id="poolSummary"></div>
-  <div class="main-layout" id="squadWorkspace">
-    <div class="squad-nav">
-      <div class="squad-nav-header"><div class="squad-nav-title">Owned Clubs</div><button class="btn-add-squad" onclick="addSquad()" title="Add custom squad" aria-label="Add custom squad">+</button></div>
-      <div class="club-toolbar">
-        <button type="button" class="btn" id="updateClubsBtn" onclick="updateClubs()">Update Clubs</button>
-        <button type="button" class="btn" onclick="deleteAllClubs()" style="border-color:rgba(248,113,113,.45);color:#fca5a5">Delete All Clubs</button>
-      </div>
-      <div class="club-sync-status" id="clubSyncStatus" role="status" aria-live="polite"></div>
-      <div class="squad-list" id="squadList" role="region" aria-label="Owned clubs list" tabindex="0"></div>
-    </div>
-    <div class="squad-view" id="squadView">
+  <div class="pool-summary">
+    <div class="pool-counts" id="poolSummary"></div>
+    <div class="pool-scan-controls" aria-label="Player scans">
       <section class="career-scan" id="careerScanPanel" aria-label="Seasons in game scan" hidden>
-        <div>
-          <div class="career-scan__title">Seasons in game <span class="career-scan__optional">Optional scan</span></div>
-          <div class="career-scan__warning">Checks each player’s history at no more than 59 API calls per 60 seconds. Large wallets could take a few minutes to update.</div>
-        </div>
         <div class="career-scan__actions">
           <button class="btn btn-accent" type="button" id="careerScanButton" onclick="startCareerScan()">Scan seasons</button>
           <button class="btn" type="button" id="careerScanRetryButton" onclick="retryFailedCareerScan()" hidden>Retry failed</button>
@@ -2529,10 +2517,6 @@ button.substitute-card:not(.is-filled):focus-visible {
         </div>
       </section>
       <section class="career-scan energy-pool-scan" id="energyPoolScanPanel" aria-label="Energy drain scan" hidden>
-        <div>
-          <div class="career-scan__title">Energy drain <span class="career-scan__optional">Optional scan</span></div>
-          <div class="career-scan__warning">Processes every player’s registered positions using both historic energy datasets, then stores compact ≤60% projections so the player list matches the squad planner.</div>
-        </div>
         <div class="career-scan__actions">
           <button class="btn btn-accent" type="button" id="energyPoolScanButton" onclick="startEnergyPoolScan()">Update energy drain</button>
           <button class="btn" type="button" id="energyPoolScanStopButton" onclick="pauseEnergyPoolScan()" hidden>Pause</button>
@@ -2543,6 +2527,19 @@ button.substitute-card:not(.is-filled):focus-visible {
           <span class="career-scan__eta" id="energyPoolScanEta">ETA —</span>
         </div>
       </section>
+    </div>
+  </div>
+  <div class="main-layout" id="squadWorkspace">
+    <div class="squad-nav">
+      <div class="squad-nav-header"><div class="squad-nav-title">Owned Clubs</div><button class="btn-add-squad" onclick="addSquad()" title="Add custom squad" aria-label="Add custom squad">+</button></div>
+      <div class="club-toolbar">
+        <button type="button" class="btn" id="updateClubsBtn" onclick="updateClubs()">Update Clubs</button>
+        <button type="button" class="btn" onclick="deleteAllClubs()" style="border-color:rgba(248,113,113,.45);color:#fca5a5">Delete All Clubs</button>
+      </div>
+      <div class="club-sync-status" id="clubSyncStatus" role="status" aria-live="polite"></div>
+      <div class="squad-list" id="squadList" role="region" aria-label="Owned clubs list" tabindex="0"></div>
+    </div>
+    <div class="squad-view" id="squadView">
       <div class="no-squad-msg" id="noSquadMsg">Select or create a squad to get started</div>
       <div id="squadContent" style="display:none">
         <div class="squad-header">
