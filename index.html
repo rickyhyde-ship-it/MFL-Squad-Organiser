@@ -2607,7 +2607,7 @@ button.substitute-card:not(.is-filled):focus-visible {
               <div class="energy-starter-controls" id="energyStarterControls"></div>
             </div>
             <div class="energy-table-heading">
-              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Match-start energy, rounded up for display. Rest recovers 65% of missing energy for no notice/yellow, 55% for orange, and 35% for red. Choose G1 and G2 separately; G1 recovery carries into G2.</span></div>
+              <div><span class="energy-section-label">Daily running energy</span><span class="energy-table-hint">Match-start energy, rounded up for display. Rest recovers 65% of missing energy for no notice/yellow, 55% for orange, and 35% for red. Choose G1 and G2 separately; G1 recovery carries into G2. Low training overrides everyone’s settings for that day only.</span></div>
               <div class="energy-legend"><span><i class="energy-dot safe"></i>&gt; 60%</span><span><i class="energy-dot danger"></i>60% or less</span><span><i class="energy-dot fallback"></i>Fallback used</span></div>
             </div>
             <div class="energy-table-shell" tabindex="0" aria-label="Scrollable daily starter energy table">
@@ -3285,7 +3285,7 @@ function getEnergyStarters(squad){
   return(squad?.starters||[]).map((slot,index)=>({slot,index,player:playerForSlot(slot)})).filter(entry=>entry.slot&&entry.player&&!isSlotIgnoredNextSeason(entry.slot)).slice(0,11).map(entry=>{
     const profile=energyProfileFor(entry);
     const key=energyPlayerKey(entry.slot,entry.index);
-    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),drain:defaultEnergyDrainFor(entry.player),retirementYears:typeof projectedRetirementYears==='function'?projectedRetirementYears(entry.player?.retireIn):entry.player?.retireIn,profile,modelKey:profile?energyModelKey(profile):null};
+    return{...entry,key,restMatches:squad.energyRests?.[key]||{},trainingIntensity:energyTrainingIntensityFor(squad,entry.slot,entry.index),lowTrainingDays:squad.energyLowTrainingDays||{},drain:defaultEnergyDrainFor(entry.player),retirementYears:typeof projectedRetirementYears==='function'?projectedRetirementYears(entry.player?.retireIn):entry.player?.retireIn,profile,modelKey:profile?energyModelKey(profile):null};
   });
 }
 
@@ -3483,7 +3483,7 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule(),inte
 
   schedule.forEach(scheduleDay=>{
     const start=energies.slice();
-    if(scheduleDay.training)energies=energies.map((energy,index)=>energyAfterTraining(energy,starters[index]?.trainingIntensity||intensity));
+    if(scheduleDay.training)energies=energies.map((energy,index)=>energyAfterTraining(energy,starters[index]?.lowTrainingDays?.[scheduleDay.day]===true?'low':starters[index]?.trainingIntensity||intensity));
     const afterTraining=energies.slice();
     const matchTypes=['league','cup'].filter(type=>scheduleDay[type]);
     const matchStarts=[];
@@ -3531,6 +3531,8 @@ function updatePitchEnergyWarnings(starters,projection){
   const countBucket=energyProjectionCounts[energyLimitedSchedule?'limited':'full'];
   starters.forEach((entry,index)=>{
     if(entry.manualDrain||!entry.modelKey||!energyModelCache.get(entry.modelKey)?.complete)return;
+    // Daily overrides belong to this squad, not the pool's standard training counts.
+    if(entry.lowTrainingDays&&projection.rows.some(row=>row.scheduleDay.training&&entry.lowTrainingDays[row.scheduleDay.day]===true))return;
     // Saved pool counts describe playing every match, independently of squad rest choices.
     if(projection.rows.some(row=>row.matchStarts.some(match=>match.resting?.[index])))return;
     const count=lowStarts.get(entry.index)||0;
@@ -3587,6 +3589,18 @@ function toggleEnergyTeamRest(day,matchType){
   renderEnergyPlanner(false);
   autoSave();
   document.getElementById(`energy-team-rest-${day}-${matchType}`)?.focus({preventScroll:true});
+}
+
+function toggleEnergyTeamLowTraining(day){
+  if(viewerMode)return;
+  const squad=activeSquad(),scheduleDay=activeEnergySchedule().find(entry=>entry.day===day);
+  if(!squad||!scheduleDay?.training)return;
+  squad.energyLowTrainingDays=squad.energyLowTrainingDays&&typeof squad.energyLowTrainingDays==='object'?squad.energyLowTrainingDays:{};
+  if(squad.energyLowTrainingDays[day]===true)delete squad.energyLowTrainingDays[day];
+  else squad.energyLowTrainingDays[day]=true;
+  renderEnergyPlanner(false);
+  autoSave();
+  document.getElementById(`energy-team-low-training-${day}`)?.focus({preventScroll:true});
 }
 
 function energyPlayerRetirementMeta(player){
@@ -3683,8 +3697,10 @@ function renderEnergyPlanner(refreshControls=true){
   const trainingEventDescription=trainingModes.length===1?ENERGY_TRAINING_DESCRIPTIONS[trainingModes[0]]:'Players use their individually selected training intensities.';
   const body=projection.rows.map(row=>{
     const day=row.scheduleDay;
+    const lowTraining=day.training&&squad.energyLowTrainingDays?.[day.day]===true;
+    const trainingControl=day.training?`<button type="button" class="energy-rest-toggle energy-team-rest-toggle" id="energy-team-low-training-${day.day}" aria-label="Low training for entire team on Day ${day.day}" aria-pressed="${lowTraining}" title="${lowTraining?'Click to restore usual training settings':'Set everyone to low training for this day only, overriding individual settings'}" onclick="toggleEnergyTeamLowTraining(${day.day})"${viewerMode?' disabled':''}>${lowTraining?'Low training on':'Low training'}</button>`:'<span class="energy-event">No training</span>';
     const events=[];
-    if(day.training)events.push(`<span class="energy-event training" title="${escAttr(trainingEventDescription)}">${trainingEventIntensity} 08:00</span>`);
+    if(day.training)events.push(`<span class="energy-event training" title="${escAttr(lowTraining?ENERGY_TRAINING_DESCRIPTIONS.low:trainingEventDescription)}">${lowTraining?'low':trainingEventIntensity} 08:00</span>`);
     row.matchStarts.forEach(match=>{
       const restCount=starters.length-match.playingCount;
       const allResting=restCount===starters.length;
@@ -3716,9 +3732,9 @@ function renderEnergyPlanner(refreshControls=true){
     const hasWarning=row.matchStarts.some(match=>match.blocked);
     const hasFallback=row.matchStarts.some(match=>match.uses.some(use=>use.source==='fallback'));
     const matchStatus=row.matchStarts.length?row.matchStarts.map(match=>{const widenedCount=match.uses.filter(use=>use.source==='widened').length,fallbackCount=match.uses.filter(use=>use.source==='fallback').length,restCount=starters.length-match.playingCount;return`<span>G${match.match}: ${match.playingCount?`${match.tiredCount}/${match.playingCount} ≤60%`:'All resting'}${match.blocked?' ⚠':''}${restCount&&match.playingCount?` · ${restCount} resting`:''}${widenedCount?` · ${widenedCount} widened`:''}${fallbackCount?` · ${fallbackCount} fallback`:''}</span>`;}).join(''):'<span>No match</span>';
-    return`<tr class="${hasFallback?'has-fallback':''}"><th scope="row" class="energy-day">D${day.day}</th><td><div class="energy-events">${events.join('')}</div></td>${cells}<td class="energy-match-status${hasWarning?' is-warning':''}">${matchStatus}</td></tr>`;
+    return`<tr class="${hasFallback?'has-fallback':''}"><th scope="row" class="energy-day">D${day.day}</th><td><div class="energy-events">${events.join('')}</div></td><td>${trainingControl}</td>${cells}<td class="energy-match-status${hasWarning?' is-warning':''}">${matchStatus}</td></tr>`;
   }).join('');
-  table.innerHTML=`<thead><tr><th scope="col">Day</th><th scope="col">Schedule</th>${playerHeaders}<th scope="col">Match starts</th></tr></thead><tbody>${body}</tbody>`;
+  table.innerHTML=`<thead><tr><th scope="col">Day</th><th scope="col">Schedule</th><th scope="col">Low training</th>${playerHeaders}<th scope="col">Match starts</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function squadSlotGroups(squad){
@@ -4201,7 +4217,7 @@ function renderSquadList(){
     d.addEventListener('click',()=>selectSquad(sq.id));divisionGroup.appendChild(d);
   });
 }
-function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};sq.energyRests={};sq.energyTrainingIntensities={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
+function clearSquad(){const sq=activeSquad();if(!sq||!confirm(`Clear every player from ${sq.name}?`))return;sq.starters=[];sq.backups=[];sq.substitutes=[];sq.loans=[];sq.energyDrains={};sq.energyRests={};sq.energyTrainingIntensities={};sq.energyLowTrainingDays={};pendingCoverPlayerId=null;renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();renderSquadList();renderPoolSummary();autoSave();}
 function deleteAllClubs(){if(!squads.length)return;if(!confirm(`Delete all ${squads.length} clubs and their saved squads?`))return;squads=[];clubsInitialized=true;showNoSquadMessage('No clubs saved. Use Update Clubs to restore your owned clubs.');renderSquadList();renderPoolSummary();setClubSyncStatus('All clubs deleted.');autoSave();}
 async function updateClubs(){const wallet=localStorage.getItem('mfl_last_wallet');if(!wallet){setClubSyncStatus('Load a wallet before updating clubs.',true);return;}const button=document.getElementById('updateClubsBtn');button.disabled=true;button.textContent='Updating…';setClubSyncStatus('Checking owned clubs…');try{const ownedClubs=await fetchOwnedClubs(wallet);const ownedIds=new Set(ownedClubs.map(club=>club.clubId));const removed=squads.filter(squad=>squad.isOwnedClub&&squad.clubId&&!ownedIds.has(String(squad.clubId)));if(removed.length&&!confirm(`Update Clubs will remove ${removed.length} club${removed.length===1?'':'s'} no longer owned by this wallet. Continue?`)){setClubSyncStatus('Club update cancelled.');return;}mergeOwnedClubs(ownedClubs,true);clubsInitialized=true;renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage(squads.length?'Select a club to build its squad.':'No MFL_OWNER clubs found for this wallet.');renderPoolSummary();autoSave();setClubSyncStatus(`${ownedClubs.length} owned club${ownedClubs.length===1?'':'s'} updated.`);}catch(error){setClubSyncStatus(error.message||'Clubs could not be updated.',true);}finally{button.disabled=false;button.textContent='Update Clubs';}}
 function selectSquad(id){activeSquadId=id;pendingCoverPlayerId=null;document.getElementById('noSquadMsg').style.display='none';document.getElementById('squadContent').style.display='block';const sq=squads.find(s=>s.id===id);if(!sq)return;sq.substitutes=Array.isArray(sq.substitutes)?sq.substitutes.slice(0,SUBSTITUTE_LIMIT):[];document.getElementById('squadNameInput').value=sq.name;document.getElementById('startersFormation').value=sq.startersFormation||'';document.getElementById('backupsFormation').value=sq.backupsFormation||'';updateNextSeasonToggle();renderPoolSummary();renderSquadList();renderBackupCoverStatus();renderPitch('starters');renderPitch('backups');renderSubstitutes();renderSquadPlayerList();}

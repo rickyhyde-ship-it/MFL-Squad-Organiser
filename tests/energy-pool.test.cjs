@@ -381,6 +381,52 @@ test('each starter can use a different training intensity in the same projection
   assert.deepEqual(Array.from(projection.final), [8400, 8000, 7700]);
 });
 
+test('daily team low training overrides individual settings once before games and resumes usual training', () => {
+  const { context } = harness();
+  const starters = ['medium', 'high'].map(trainingIntensity => ({
+    drain: 20, manualDrain: true, trainingIntensity,
+    lowTrainingDays: { 2: true, 4: true }, restMatches: { '2:league': true },
+  }));
+  const schedule = [
+    { day: 1, training: false, league: true },
+    { day: 2, training: true, league: true, cup: true },
+    { day: 3, training: true },
+    { day: 4, training: false },
+  ];
+  const projection = context.calculateEnergyProjection(starters, schedule);
+  assert.deepEqual(Array.from(projection.rows[1].afterTraining), [8400, 8400]);
+  assert.deepEqual(Array.from(projection.rows[1].matchStarts[1].energies), [9440, 9440]);
+  assert.deepEqual(Array.from(projection.rows[2].afterTraining), [7440, 7084]);
+  assert.deepEqual(Array.from(projection.final), [7440, 7084]);
+  starters.forEach(starter => { starter.lowTrainingDays = {}; });
+  assert.deepEqual(Array.from(context.calculateEnergyProjection(starters, schedule).rows[1].afterTraining), [8000, 7700]);
+});
+
+test('daily low training toggles persist per squad without changing usual settings or rest choices', () => {
+  const { context, read, storage } = harness();
+  read(`
+    let viewerMode=false,saveCount=0;
+    const squad={energyTrainingIntensities:{'player:1':'high'},energyRests:{'player:1':{'7:cup':true}}};
+    function activeSquad(){return squad;}
+    function autoSave(){saveCount++;localStorage.setItem('squad',JSON.stringify(squad));}
+    const document={getElementById:()=>({focus(){}})};
+    ${functionSource('toggleEnergyTeamLowTraining')}
+  `);
+  context.toggleEnergyTeamLowTraining(7);
+  context.toggleEnergyTeamLowTraining(15); // A training day without matches.
+  assert.deepEqual(JSON.parse(storage.get('squad')).energyLowTrainingDays, { 7: true, 15: true });
+  context.toggleEnergyTeamLowTraining(7);
+  const saved = JSON.parse(storage.get('squad'));
+  assert.deepEqual(saved.energyLowTrainingDays, { 15: true });
+  assert.equal(saved.energyTrainingIntensities['player:1'], 'high');
+  assert.equal(saved.energyRests['player:1']['7:cup'], true);
+  context.toggleEnergyTeamLowTraining(1);
+  context.toggleEnergyTeamLowTraining(99);
+  read('viewerMode=true');
+  context.toggleEnergyTeamLowTraining(15);
+  assert.equal(read('saveCount'), 3);
+});
+
 test('individual training overrides persist and a team change synchronizes every starter', () => {
   const { context, read, storage } = harness();
   read(`

@@ -265,7 +265,7 @@
       const baseFill = rowIndex % 2 ? '#0b1219' : '#0e161f';
       const values = [
         [`D${row.scheduleDay.day}`],
-        [scheduleLabel(row.scheduleDay)],
+        [scheduleLabel(row.scheduleDay), ...(row.scheduleDay.training && snapshot.squad.energyLowTrainingDays?.[row.scheduleDay.day] === true ? ['Team: low training'] : [])],
         ...snapshot.starters.map((entry, playerIndex) => playerCellLines(snapshot, row, playerIndex)),
         dayStatus(snapshot, row)
       ];
