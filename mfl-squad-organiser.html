@@ -2537,6 +2537,7 @@ button.substitute-card:not(.is-filled):focus-visible {
         <button type="button" class="btn" onclick="deleteAllClubs()" style="border-color:rgba(248,113,113,.45);color:#fca5a5">Delete All Clubs</button>
       </div>
       <div class="club-sync-status" id="clubSyncStatus" role="status" aria-live="polite"></div>
+      <div class="club-sync-status" id="squadSaveStatus" role="status" aria-live="polite"></div>
       <div class="squad-list" id="squadList" role="region" aria-label="Owned clubs list" tabindex="0"></div>
     </div>
     <div class="squad-view" id="squadView">
@@ -2729,6 +2730,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
 <script src="./player-career-scan.js?v=1.1.0"></script>
 <script>
+let squadStorageKey=null;
 let allPlayers=[], squads=[], activeSquadId=null, collapsedDivisions=new Set(), addPlayerTarget='starters', addPlayerSlotIdx=null;
 let dragSection=null, dragIdx=null, upgradeFilterOn=false, loanLookupPlayer=null, nextSeasonMode=false;
 let playerSortKey='ovr',playerSortDirection='desc';
@@ -3966,12 +3968,13 @@ async function loadPlayers() {
     const [raw, clubResult, progressionResult] = await Promise.all([fetchAllOwnedPlayers(wallet, statusEl), clubsPromise, progressionPromise]);
     if (!raw.length) throw new Error('No players found for this wallet address.');
     allPlayers = raw.map(player=>mapApiPlayer(player,progressionResult.progressions[String(player?.id)])).filter(Boolean).sort((a,b) => b.ovr - a.ovr);
+    squadStorageKey = resolveSquadStorageKey(wallet);
     localStorage.setItem('mfl_last_wallet', wallet);
     careerScanWallet=wallet.toLowerCase();
     applyCareerCache(careerScanWallet);
     loadEnergyProjectionCounts(careerScanWallet);
     // Restore squads saved for this wallet
-    const saved = localStorage.getItem('mfl_squads_' + wallet);
+    const saved = localStorage.getItem(squadStorageKey);
     squads = []; activeSquadId = null; collapsedDivisions = new Set(); clubsInitialized = false;
     if (saved) {
       try {
@@ -4826,18 +4829,51 @@ function buildSquadPlayerCache(){
   }));
 }
 
+// Keep the loaded wallet's key for this tab; another tab can change mfl_last_wallet.
+function resolveSquadStorageKey(wallet){
+  const normalized=String(wallet||'').trim().toLowerCase();
+  if(!normalized)return 'mfl_squads';
+  const key='mfl_squads_'+normalized;
+  if(localStorage.getItem(key)!==null)return key;
+  // Continue using a legacy mixed-case key so existing squads remain available.
+  for(let index=0;index<localStorage.length;index++){
+    const existing=localStorage.key(index);
+    if(existing&&existing.toLowerCase()===key)return existing;
+  }
+  return key;
+}
+
+function setSquadSaveStatus(message,isError=false){
+  const status=document.getElementById('squadSaveStatus');
+  if(!status)return;
+  status.textContent=message;
+  status.style.color=isError?'var(--red)':'var(--text-muted)';
+}
+
 function autoSave(){
   if(viewerMode)return;
   try {
-    const wallet = localStorage.getItem('mfl_last_wallet');
-    const key = wallet ? 'mfl_squads_' + wallet : 'mfl_squads';
-    localStorage.setItem(key, JSON.stringify({squads, activeSquadId, collapsedDivisions:[...collapsedDivisions], clubsInitialized, playerCache: buildSquadPlayerCache()}));
-  } catch(e) {}
+    if(!squadStorageKey)squadStorageKey=resolveSquadStorageKey(localStorage.getItem('mfl_last_wallet'));
+    const state={squads,activeSquadId,collapsedDivisions:[...collapsedDivisions],clubsInitialized};
+    try {
+      localStorage.setItem(squadStorageKey,JSON.stringify({...state,playerCache:buildSquadPlayerCache()}));
+    } catch(error) {
+      // Player metadata is optional: preserve the edits even when the browser
+      // cannot fit the larger cache or a player's metadata cannot be serialized.
+      localStorage.setItem(squadStorageKey,JSON.stringify(state));
+    }
+    setSquadSaveStatus('Squad changes saved in this browser.');
+    return true;
+  } catch(error) {
+    console.warn('Squad changes could not be saved',error);
+    setSquadSaveStatus('Changes could not be saved. Export your session before refreshing.',true);
+    return false;
+  }
 }
 function exportSession(){const d={version:4,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId,collapsedDivisions:[...collapsedDivisions],clubsInitialized};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
 function importSession(){document.getElementById('importInput').click();}
 document.getElementById('importInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=Array.isArray(d.players)?d.players:[];squads=Array.isArray(d.squads)?d.squads.filter(Boolean):[];activeSquadId=d.activeSquadId||null;collapsedDivisions=normalizeCollapsedDivisions(d.collapsedDivisions);clubsInitialized=d.clubsInitialized===true;sortSquads();renderPoolSummary();renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage();autoSave();}catch(e){alert('Invalid save');}};r.readAsText(f);e.target.value='';});
-function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');if(wallet)localStorage.removeItem('mfl_squads_'+wallet);document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
+function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');localStorage.removeItem(squadStorageKey||resolveSquadStorageKey(wallet));squadStorageKey=null;document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 if(viewerMode)startDelegationSquadViewer();
 </script>
 <script src="./energy-lab.js?v=1.1.0"></script>
