@@ -1,5 +1,5 @@
 (function () {
-  const API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod";
+  const API_BASE = "https://api.playmfl.com";
   const CLUBS_QUERY = "withLeagueRank=true&withNextMatch=true&withPlayersCount=true&withLastMatches=true";
   const params = new URLSearchParams(window.location.search);
   const wallet = normalizeWallet(params.get("wallet") || localStorage.getItem("agentHubWallet") || "");

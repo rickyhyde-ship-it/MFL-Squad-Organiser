@@ -160,7 +160,7 @@
   async function fetchPlayer(id) {
     const owned = typeof allPlayers !== 'undefined' && Array.isArray(allPlayers) ? allPlayers.find(player => String(player.id) === String(id)) : null;
     if (owned) return owned;
-    const base = typeof API_BASE !== 'undefined' ? API_BASE : 'https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod';
+    const base = typeof API_BASE !== 'undefined' ? API_BASE : 'https://api.playmfl.com';
     const response = await fetch(`${base}/players/${encodeURIComponent(id)}`);
     if (response.status === 404) throw new Error(`Player ${id} was not found.`);
     if (!response.ok) throw new Error(`Player ${id} lookup failed (${response.status}).`);
