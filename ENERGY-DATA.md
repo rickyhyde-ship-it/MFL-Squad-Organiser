@@ -4,8 +4,8 @@ Both `index.html` and `mfl-squad-organiser.html` request the same player profile
 
 | Collection | Match dates (UTC, inclusive) | Match pairs |
 | --- | --- | ---: |
-| [Original August collection](https://mfl-energy-crawler.ricky-hyde-selling.workers.dev/api/dashboard) | 12–29 August 2026 | 842,353 |
-| [July–August collection](https://mfl-energy-crawler-jul-aug-2026.ricky-hyde-selling.workers.dev/api/dashboard) | 1 July–5 August 2026 | 1,199,939 |
+| [Original August collection](https://energy.the-agent-hub.com/api/dashboard) | 12–29 August 2026 | 842,353 |
+| [July–August collection](https://energy-archive.the-agent-hub.com/api/dashboard) | 1 July–5 August 2026 | 1,199,939 |
 
 Collection status and matching rules were checked on 2 September 2026. The source pool contains **2,042,292 match pairs**. Each profile uses only its matching, usable observations; this total is not the sample size of every prediction. Both collections compare consecutive starting-XI appearances at most 30 hours apart.
 
