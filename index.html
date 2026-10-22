@@ -2730,7 +2730,7 @@ button.substitute-card:not(.is-filled):focus-visible {
 
 <script src="./player-career-scan.js?v=1.1.0"></script>
 <script>
-let squadStorageKey=null;
+let squadStorageKey=null,squadIndexedDBActive=false,squadPersistenceQueue=Promise.resolve();
 let allPlayers=[], squads=[], activeSquadId=null, collapsedDivisions=new Set(), addPlayerTarget='starters', addPlayerSlotIdx=null;
 let dragSection=null, dragIdx=null, upgradeFilterOn=false, loanLookupPlayer=null, nextSeasonMode=false;
 let playerSortKey='ovr',playerSortDirection='desc';
@@ -3974,7 +3974,8 @@ async function loadPlayers() {
     applyCareerCache(careerScanWallet);
     loadEnergyProjectionCounts(careerScanWallet);
     // Restore squads saved for this wallet
-    const saved = localStorage.getItem(squadStorageKey);
+    let saved = localStorage.getItem(squadStorageKey);
+    if(!saved){try{saved=await loadSquadStateFromDatabase(squadStorageKey);squadIndexedDBActive=Boolean(saved);}catch(storageError){console.warn('Saved squad could not be read from browser database',storageError);}}
     squads = []; activeSquadId = null; collapsedDivisions = new Set(); clubsInitialized = false;
     if (saved) {
       try {
@@ -4850,30 +4851,96 @@ function setSquadSaveStatus(message,isError=false){
   status.style.color=isError?'var(--red)':'var(--text-muted)';
 }
 
+function openSquadDatabase(){
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB){reject(new Error('Browser database storage is unavailable.'));return;}
+    const request=window.indexedDB.open('mfl-squad-organiser',1);
+    request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('squads'))request.result.createObjectStore('squads');};
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Could not open browser database storage.'));
+    request.onblocked=()=>reject(new Error('Browser database storage is blocked by another tab.'));
+  });
+}
+
+async function loadSquadStateFromDatabase(key){
+  const database=await openSquadDatabase();
+  try{return await new Promise((resolve,reject)=>{
+    const transaction=database.transaction('squads','readonly'),request=transaction.objectStore('squads').get(key);
+    request.onsuccess=()=>resolve(typeof request.result==='string'?request.result:null);
+    request.onerror=()=>reject(request.error||new Error('Could not read the saved squad.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Could not read the saved squad.'));
+  });}finally{database.close();}
+}
+
+async function saveSquadStateToDatabase(key,value){
+  const database=await openSquadDatabase();
+  try{return await new Promise((resolve,reject)=>{
+    const transaction=database.transaction('squads','readwrite');
+    transaction.objectStore('squads').put(value,key);
+    transaction.oncomplete=()=>resolve();
+    transaction.onerror=()=>reject(transaction.error||new Error('Could not save the squad.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Could not save the squad.'));
+  });}finally{database.close();}
+}
+
+function deleteSquadStateFromDatabase(key){
+  openSquadDatabase().then(database=>{
+    const transaction=database.transaction('squads','readwrite');
+    transaction.objectStore('squads').delete(key);
+    transaction.oncomplete=()=>database.close();
+    transaction.onerror=()=>database.close();
+    transaction.onabort=()=>database.close();
+  }).catch(error=>console.warn('Saved squad could not be removed from browser database',error));
+}
+
 function autoSave(){
   if(viewerMode)return;
+  let key;
   try {
     if(!squadStorageKey)squadStorageKey=resolveSquadStorageKey(localStorage.getItem('mfl_last_wallet'));
+    key=squadStorageKey;
     const state={squads,activeSquadId,collapsedDivisions:[...collapsedDivisions],clubsInitialized};
+    if(squadIndexedDBActive)throw new Error('Using browser database storage.');
     try {
-      localStorage.setItem(squadStorageKey,JSON.stringify({...state,playerCache:buildSquadPlayerCache()}));
+      localStorage.setItem(key,JSON.stringify({...state,playerCache:buildSquadPlayerCache()}));
     } catch(error) {
       // Player metadata is optional: preserve the edits even when the browser
       // cannot fit the larger cache or a player's metadata cannot be serialized.
-      localStorage.setItem(squadStorageKey,JSON.stringify(state));
+      localStorage.setItem(key,JSON.stringify(state));
     }
     setSquadSaveStatus('Squad changes saved in this browser.');
     return true;
   } catch(error) {
-    console.warn('Squad changes could not be saved',error);
-    setSquadSaveStatus('Changes could not be saved. Export your session before refreshing.',true);
-    return false;
+    if(typeof window==='undefined'||!window.indexedDB){
+      console.warn('Squad changes could not be saved',error);
+      setSquadSaveStatus('Changes could not be saved. Export your session before refreshing.',true);
+      return false;
+    }
+    try{
+      if(!key)key=squadStorageKey||resolveSquadStorageKey(localStorage.getItem('mfl_last_wallet'));
+      const state={squads,activeSquadId,collapsedDivisions:[...collapsedDivisions],clubsInitialized};
+      const serialized=JSON.stringify(state);
+      squadIndexedDBActive=true;
+      setSquadSaveStatus('Browser storage is full. Saving squad…');
+      squadPersistenceQueue=squadPersistenceQueue.then(()=>saveSquadStateToDatabase(key,serialized)).then(()=>{
+        try{localStorage.removeItem(key);}catch(removeError){}
+        setSquadSaveStatus('Squad changes saved in browser database storage.');
+      }).catch(databaseError=>{
+        console.warn('Squad changes could not be saved',databaseError);
+        setSquadSaveStatus('Changes could not be saved. Export your session before refreshing.',true);
+      });
+      return true;
+    }catch(fallbackError){
+      console.warn('Squad changes could not be saved',fallbackError);
+      setSquadSaveStatus('Changes could not be saved. Export your session before refreshing.',true);
+      return false;
+    }
   }
 }
 function exportSession(){const d={version:4,exportDate:new Date().toISOString(),players:allPlayers,squads,activeSquadId,collapsedDivisions:[...collapsedDivisions],clubsInitialized};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='mfl-squads-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);}
 function importSession(){document.getElementById('importInput').click();}
 document.getElementById('importInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);allPlayers=Array.isArray(d.players)?d.players:[];squads=Array.isArray(d.squads)?d.squads.filter(Boolean):[];activeSquadId=d.activeSquadId||null;collapsedDivisions=normalizeCollapsedDivisions(d.collapsedDivisions);clubsInitialized=d.clubsInitialized===true;sortSquads();renderPoolSummary();renderSquadList();if(activeSquadId)selectSquad(activeSquadId);else showNoSquadMessage();autoSave();}catch(e){alert('Invalid save');}};r.readAsText(f);e.target.value='';});
-function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet');localStorage.removeItem(squadStorageKey||resolveSquadStorageKey(wallet));squadStorageKey=null;document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
+function resetAll(){if(!confirm('Reset everything?'))return;careerScanStop=true;energyPoolScanStop=true;squads=[];activeSquadId=null;collapsedDivisions=new Set();allPlayers=[];clubsInitialized=false;const wallet=localStorage.getItem('mfl_last_wallet'),key=squadStorageKey||resolveSquadStorageKey(wallet);localStorage.removeItem(key);deleteSquadStateFromDatabase(key);squadStorageKey=null;squadIndexedDBActive=false;document.getElementById('appScreen').style.display='none';document.getElementById('uploadScreen').style.display='flex';document.getElementById('loadStatus').textContent='';checkWalletReady();}
 if(viewerMode)startDelegationSquadViewer();
 </script>
 <script src="./energy-lab.js?v=1.1.0"></script>
