@@ -33,8 +33,8 @@
   function scheduleLabel(day) {
     const events = [];
     if (day.training) events.push('Training');
-    if (day.league) events.push('League');
     if (day.cup) events.push('Cup');
+    if (day.league) events.push('League');
     return events.join(' + ') || 'No events';
   }
 
@@ -169,7 +169,7 @@
     ctx.fillRect(0, 0, 8, layout.headerHeight);
     drawText(ctx, 'MFL // STARTING XI ENERGY PLANNER', margin, 50, { color: COLORS.accent, font: '700 17px "JetBrains Mono", monospace' });
     drawText(ctx, snapshot.squad.name || 'Starting XI', margin, 102, { font: '700 44px "Space Grotesk", sans-serif', maxWidth: width - 720 });
-    drawText(ctx, `Season 17 workload · Division ${snapshot.squad.division ?? '—'} · ${snapshot.matches}-match schedule`, margin, 136, { color: COLORS.secondary, font: '500 17px "DM Sans", sans-serif' });
+    drawText(ctx, `Season 18 workload · Division ${snapshot.squad.division ?? '—'} · ${snapshot.matches}-match schedule`, margin, 136, { color: COLORS.secondary, font: '500 17px "DM Sans", sans-serif' });
 
     const badgeWidth = 470;
     roundedRect(ctx, width - margin - badgeWidth, 34, badgeWidth, 108, 12, COLORS.panel, COLORS.borderStrong);
@@ -177,7 +177,7 @@
     ctx.fillRect(width - margin - badgeWidth, 34, 7, 108);
     drawText(ctx, 'EXPORT INCLUDES', width - margin - badgeWidth + 28, 68, { color: COLORS.green, font: '700 12px "JetBrains Mono", monospace' });
     drawText(ctx, `${snapshot.starters.length} starters · ${snapshot.projection.rows.length} days · ${snapshot.matches} matches`, width - margin - badgeWidth + 28, 100, { font: '700 20px "Space Grotesk", sans-serif', maxWidth: badgeWidth - 50 });
-    drawText(ctx, energyLimitedSchedule ? 'Limited schedule' : 'Full schedule', width - margin - badgeWidth + 28, 126, { color: COLORS.secondary, font: '600 13px "DM Sans", sans-serif' });
+    drawText(ctx, energyExcludeCups ? 'League only' : energyLimitedSchedule ? 'Limited schedule' : 'Full schedule', width - margin - badgeWidth + 28, 126, { color: COLORS.secondary, font: '600 13px "DM Sans", sans-serif' });
   }
 
   function drawSummary(ctx, snapshot, layout, startY) {

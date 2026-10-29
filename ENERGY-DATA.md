@@ -22,13 +22,13 @@ The windows do not overlap. This matters because the model endpoints return aggr
 
 ## Training and rest choices
 
-The training intensity control beside the schedule toggle applies once before matches on each training day (Days 2–29). Low is the default, and the selected intensity is saved in this browser.
+The training intensity control beside the schedule toggle applies once before matches on each training day (Days 1–29). Low is the default, and the selected intensity is saved in this browser.
 
 - **Low:** `energy + 0.20 * (10000 - energy)`.
 - **Medium:** no energy change.
 - **High:** `energy - 100 - 0.10 * (10000 - energy)`, with the existing 1500 energy floor.
 
-Calculations use raw energy and round the result to whole raw units. The daily table, pitch warnings and player-pool projections all use the selected intensity. The energy scan stores separate counts for all three intensities and both schedules; existing Low counts remain valid.
+Calculations use raw energy and round the result to whole raw units. The daily table, pitch warnings and player-pool projections all use the selected intensity. The energy scan stores separate counts for all three intensities and all three schedule options; existing Low counts remain valid.
 
 Team and individual rest choices are preserved when intensity changes. Rest restores 65% of the energy missing at that match's start for players with no retirement notice or a yellow (3-season) notice, 55% for orange (2 seasons), and 35% for red (1 season), with no match drain. On double-match days, training happens once, followed by G1 and G2 in order.
 
@@ -36,6 +36,10 @@ Team and individual rest choices are preserved when intensity changes. Rest rest
 
 Run `node --test MFL-Squad-Organiser/tests/energy-pool.test.cjs` from the workspace root. The tests cover sample weighting, standard/widened precedence, outages, retries, cache invalidation and consistency between planner and scan calculations.
 
-A live browser check queried both services for nine profiles across an eleven-player sample squad, reconciled usable sample totals, completed the pool scan and checked the 35- and 28-match schedules without page errors. A profile with no usable evidence still uses the existing fallback.
+A live browser check queried both services for nine profiles across an eleven-player sample squad, reconciled usable sample totals, completed the pool scan and checked the then-current schedules without page errors. A profile with no usable evidence still uses the existing fallback.
 
 Publish both updated HTML entry points to update the hosted builder. No additional runtime assets or backend changes are required by this integration.
+
+## Season 18 calendar
+
+The planner follows the [MFL competition calendar](https://app.playmfl.com/competitions/calendar) from 4 November to 2 December 2026: 29 training sessions, 22 league matches and up to 10 cup matches. The 28-match option includes all league games and the first six cup rounds; Remove cup games leaves 22 league matches. Training is applied first each day, followed by the cup and then the league match. Cached pool projections from earlier schedules are recalculated after an energy scan.

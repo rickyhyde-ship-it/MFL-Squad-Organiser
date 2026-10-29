@@ -2572,15 +2572,19 @@ button.substitute-card:not(.is-filled):focus-visible {
         <section class="energy-planner" id="energyPlanner" aria-labelledby="energyPlannerTitle">
           <div class="energy-planner-header">
             <div>
-              <div class="energy-planner-kicker">Season 17 workload</div>
+              <div class="energy-planner-kicker">Season 18 workload · starts 4 Nov 2026</div>
               <h2 class="energy-planner-title" id="energyPlannerTitle">Starting XI energy planner</h2>
-              <p class="energy-planner-copy">Match drain is modelled from real comparable players at the energy they start each game. <span id="energyTrainingDescription">Low training restores 20% of missing energy before games on Days 2–29.</span></p>
+              <p class="energy-planner-copy">Match drain is modelled from real comparable players at the energy they start each game. <span id="energyTrainingDescription">Low training restores 20% of missing energy before games on Days 1–29.</span></p>
             </div>
             <div class="energy-planner-actions">
               <div class="energy-planner-switches">
               <button type="button" class="energy-schedule-toggle" id="energyScheduleToggle" role="switch" aria-checked="false" onclick="toggleEnergyScheduleMode()">
                 <span class="energy-toggle-rail" aria-hidden="true"><i></i></span>
-                <span class="energy-toggle-copy"><strong>28-game schedule</strong><small>First 6 cups · no league D31–33</small></span>
+                <span class="energy-toggle-copy"><strong>28-game schedule</strong><small>First 6 cup rounds · all league matches</small></span>
+              </button>
+              <button type="button" class="energy-schedule-toggle" id="energyCupToggle" role="switch" aria-checked="false" onclick="toggleEnergyCups()">
+                <span class="energy-toggle-rail" aria-hidden="true"><i></i></span>
+                <span class="energy-toggle-copy"><strong>Remove cup games</strong><small>League matches and training only</small></span>
               </button>
               <div class="energy-training-control" role="group" aria-labelledby="energyTrainingLabel" aria-describedby="energyTrainingDescription">
                 <span class="energy-training-label" id="energyTrainingLabel">Team training intensity</span>
@@ -2593,7 +2597,7 @@ button.substitute-card:not(.is-filled):focus-visible {
               </div>
               <div class="energy-planner-export-row">
                 <div class="energy-planner-badges" aria-label="Schedule summary">
-                  <span id="energyMatchCountBadge">35 matches</span><span>28 training days</span><span>15% floor</span>
+                  <span id="energyMatchCountBadge">32 matches</span><span>29 training days</span><span>15% floor</span>
                 </div>
                 <button type="button" class="energy-export-button" id="startingXiEnergyExportButton" onclick="exportStartingXiEnergyPng()" disabled>Export all as PNG</button>
                 <span class="energy-export-status" id="startingXiEnergyExportStatus" role="status" aria-live="polite"></span>
@@ -2656,7 +2660,7 @@ button.substitute-card:not(.is-filled):focus-visible {
             <div class="energy-lab-panel-head">
               <div><span class="energy-lab-section-tag">02 / Trend</span><h2 id="energyLabChartHeading">All-player energy</h2><p>Daily closing energy across the season. Horizontal dashed guides are personal start limits; diamonds mark automatic rests.</p></div>
               <div class="energy-lab-toolbar">
-                <button class="energy-lab-button energy-lab-button--quiet" type="button" id="energyLabScheduleToggle">Toggle 28 / 35 matches</button>
+                <button class="energy-lab-button energy-lab-button--quiet" type="button" id="energyLabScheduleToggle">Toggle 28 / 32 matches</button>
                 <div class="energy-lab-export">
                   <label for="energyLabExportMode"><span class="energy-lab-export-label">PNG content</span><select class="energy-lab-export-select" id="energyLabExportMode"><option value="graph">Graph only</option><option value="table">Daily table only</option><option value="both" selected>Graph + table</option></select></label>
                   <button class="energy-lab-button" type="button" id="energyLabExportButton" disabled>Export PNG</button>
@@ -2738,7 +2742,7 @@ let pendingCoverPlayerId=null;
 let clubsInitialized=false;
 let careerScanWallet='',careerScanning=false,careerScanStop=false,careerScanForce=false,careerScanRetryOnly=false;
 let energyPoolScanning=false,energyPoolScanStop=false,energyPoolScanForce=false;
-let energyProjectionCounts={full:{},limited:{}};
+let energyProjectionCounts={full:{},limited:{},noCup:{}};
 const API_BASE='https://api.playmfl.com';
 const PLAYER_PAGE_LIMIT=500;
 const MAX_PLAYER_PAGES=50;
@@ -2753,9 +2757,9 @@ const ENERGY_LOW_RAW=6000;
 const ENERGY_REST_RECOVERY=0.65;
 const ENERGY_TRAINING_MODES=['low','medium','high'];
 const ENERGY_TRAINING_DESCRIPTIONS={
-  low:'Low training restores 20% of missing energy before games on Days 2–29.',
-  medium:'Medium training leaves energy unchanged before games on Days 2–29.',
-  high:'High training costs 1% of full energy plus 10% of missing energy before games on Days 2–29, with a 15% floor.'
+  low:'Low training restores 20% of missing energy before games on Days 1–29.',
+  medium:'Medium training leaves energy unchanged before games on Days 1–29.',
+  high:'High training costs 1% of full energy plus 10% of missing energy before games on Days 1–29, with a 15% floor.'
 };
 const ENERGY_MATCH_TOLERANCE_RAW=300;
 const ENERGY_POOL_BATCH_SIZE=11;
@@ -2770,54 +2774,30 @@ const energyModelRequests=new Set();
 const energyModelFailures=new Map();
 let energyModelMessage='Loading real-match energy evidence…';
 let energyLimitedSchedule=localStorage.getItem('mfl_energy_limited_schedule')==='1';
+let energyExcludeCups=localStorage.getItem('mfl_energy_exclude_cups')==='1';
 let energyTrainingIntensity=normalizeEnergyTrainingIntensity(localStorage.getItem('mfl_energy_training_intensity'));
-const ENERGY_SCHEDULE=[
-  {day:1,training:false,league:true,cup:false},
-  {day:2,training:true,league:true,cup:false},
-  {day:3,training:true,league:true,cup:false},
-  {day:4,training:true,league:true,cup:false},
-  {day:5,training:true,league:true,cup:false},
-  {day:6,training:true,league:false,cup:true},
-  {day:7,training:true,league:true,cup:true},
-  {day:8,training:true,league:true,cup:false},
-  {day:9,training:true,league:true,cup:true},
-  {day:10,training:true,league:true,cup:true},
-  {day:11,training:true,league:true,cup:false},
-  {day:12,training:true,league:false,cup:true},
-  {day:13,training:true,league:true,cup:false},
-  {day:14,training:true,league:false,cup:true},
-  {day:15,training:true,league:false,cup:false},
-  {day:16,training:true,league:false,cup:false},
-  {day:17,training:true,league:true,cup:false},
-  {day:18,training:true,league:true,cup:false},
-  {day:19,training:true,league:false,cup:true},
-  {day:20,training:true,league:true,cup:false},
-  {day:21,training:true,league:true,cup:true},
-  {day:22,training:true,league:true,cup:false},
-  {day:23,training:true,league:true,cup:true},
-  {day:24,training:true,league:true,cup:false},
-  {day:25,training:true,league:true,cup:false},
-  {day:26,training:true,league:true,cup:false},
-  {day:27,training:true,league:true,cup:false},
-  {day:28,training:true,league:false,cup:true},
-  {day:29,training:true,league:true,cup:false},
-  {day:30,training:false,league:false,cup:false},
-  {day:31,training:false,league:true,cup:false},
-  {day:32,training:false,league:true,cup:false},
-  {day:33,training:false,league:true,cup:false}
-];
+// Season 18 calendar: 4 November–2 December 2026. Training precedes cup, then league.
+const ENERGY_SCHEDULE=Array.from({length:29},(_,index)=>{
+  const day=index+1;
+  return {day,training:true,league:[1,2,3,4,5,7,8,9,10,11,13,17,18,20,21,22,23,24,25,26,27,29].includes(day),cup:[6,7,9,10,12,14,19,21,23,28].includes(day)};
+});
 
-function energyScheduleForMode(limited){
-  if(!limited)return ENERGY_SCHEDULE;
+function energyScheduleForMode(limited,excludeCups=false){
   let cupsIncluded=0;
-  return ENERGY_SCHEDULE.filter(day=>day.day<=30).map(day=>{
-    const cup=Boolean(day.cup&&cupsIncluded<6);
+  return ENERGY_SCHEDULE.map(day=>{
+    const cup=Boolean(day.cup&&!excludeCups&&(!limited||cupsIncluded<6));
     if(cup)cupsIncluded+=1;
-    return{...day,cup};
+    return {...day,cup};
   });
 }
 
-function activeEnergySchedule(){return energyScheduleForMode(energyLimitedSchedule);}
+function activeEnergySchedule(){return energyScheduleForMode(energyLimitedSchedule,energyExcludeCups);}
+
+function toggleEnergyCups(){
+  energyExcludeCups=!energyExcludeCups;
+  localStorage.setItem('mfl_energy_exclude_cups',energyExcludeCups?'1':'0');
+  renderEnergyPlanner(false);
+}
 
 function toggleEnergyScheduleMode(){
   energyLimitedSchedule=!energyLimitedSchedule;
@@ -3094,14 +3074,14 @@ async function startCareerScan(mode='auto'){
 }
 
 // v2 replaces projections calculated with only the August collection.
-function energyProjectionStorageKey(wallet=careerScanWallet){return`mfl_energy_projection_counts_v2_${String(wallet||'').toLowerCase()}`;}
+function energyProjectionStorageKey(wallet=careerScanWallet){return`mfl_energy_projection_counts_v3_${String(wallet||'').toLowerCase()}`;}
 
 function loadEnergyProjectionCounts(wallet=careerScanWallet){
-  energyProjectionCounts={full:{},limited:{}};
+  energyProjectionCounts={full:{},limited:{},noCup:{}};
   if(!wallet)return;
   try{
     const saved=JSON.parse(localStorage.getItem(energyProjectionStorageKey(wallet))||'null');
-    if(saved&&saved.full&&saved.limited)energyProjectionCounts={full:{...saved.full},limited:{...saved.limited}};
+    if(saved&&saved.full&&saved.limited)energyProjectionCounts={full:{...saved.full},limited:{...saved.limited},noCup:{...saved.noCup}};
   }catch(error){console.warn('Energy projection cache could not be loaded',error);}
 }
 
@@ -3115,12 +3095,12 @@ function energyProjectionCountKey(modelKey,intensity=energyTrainingIntensity){re
 
 function storedEnergyProjectionCount(modelKey,limited=energyLimitedSchedule,intensity=energyTrainingIntensity){
   if(!modelKey)return null;
-  const value=energyProjectionCounts[limited?'limited':'full']?.[energyProjectionCountKey(modelKey,intensity)];
+  const value=energyProjectionCounts[energyExcludeCups?'noCup':limited?'limited':'full']?.[energyProjectionCountKey(modelKey,intensity)];
   return Number.isFinite(Number(value))?Number(value):null;
 }
 
 function energyPoolReadyCount(profiles){
-  return profiles.reduce((count,profile)=>count+Number(ENERGY_TRAINING_MODES.every(intensity=>storedEnergyProjectionCount(profile.key,false,intensity)!==null&&storedEnergyProjectionCount(profile.key,true,intensity)!==null)),0);
+  return profiles.reduce((count,profile)=>count+Number(ENERGY_TRAINING_MODES.every(intensity=>['full','limited','noCup'].every(bucket=>Number.isFinite(Number(energyProjectionCounts[bucket]?.[energyProjectionCountKey(profile.key,intensity)]))&&energyProjectionCounts[bucket]?.[energyProjectionCountKey(profile.key,intensity)]!=null))),0);
 }
 
 function updateEnergyPoolScanPanel(progress=null){
@@ -3178,6 +3158,7 @@ async function startEnergyPoolScan(){
             const key=energyProjectionCountKey(profile.key,intensity);
             energyProjectionCounts.full[key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false),intensity);
             energyProjectionCounts.limited[key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(true),intensity);
+            energyProjectionCounts.noCup[key]=lowStartCountForEnergyModel(profile,model,energyScheduleForMode(false,true),intensity);
           });
         });
       }catch(error){
@@ -3487,7 +3468,7 @@ function calculateEnergyProjection(starters,schedule=activeEnergySchedule(),inte
     const start=energies.slice();
     if(scheduleDay.training)energies=energies.map((energy,index)=>energyAfterTraining(energy,starters[index]?.lowTrainingDays?.[scheduleDay.day]===true?'low':starters[index]?.trainingIntensity||intensity));
     const afterTraining=energies.slice();
-    const matchTypes=['league','cup'].filter(type=>scheduleDay[type]);
+    const matchTypes=['cup','league'].filter(type=>scheduleDay[type]);
     const matchStarts=[];
 
     for(let matchIndex=0;matchIndex<matchTypes.length;matchIndex++){
@@ -3530,7 +3511,7 @@ function updatePitchEnergyWarnings(starters,projection){
     if(starter)lowStarts.set(starter.index,(lowStarts.get(starter.index)||0)+1);
   })));
   let cacheChanged=false;
-  const countBucket=energyProjectionCounts[energyLimitedSchedule?'limited':'full'];
+  const countBucket=energyProjectionCounts[energyExcludeCups?'noCup':energyLimitedSchedule?'limited':'full'];
   starters.forEach((entry,index)=>{
     if(entry.manualDrain||!entry.modelKey||!energyModelCache.get(entry.modelKey)?.complete)return;
     // Daily overrides belong to this squad, not the pool's standard training counts.
@@ -3640,7 +3621,8 @@ function renderEnergyPlanner(refreshControls=true){
   const schedule=activeEnergySchedule();
   const scheduleToggle=document.getElementById('energyScheduleToggle'),matchCountBadge=document.getElementById('energyMatchCountBadge');
   const scheduleMatchCount=schedule.reduce((total,day)=>total+Number(day.league)+Number(day.cup),0);
-  if(scheduleToggle)scheduleToggle.setAttribute('aria-checked',String(energyLimitedSchedule));
+  if(scheduleToggle){scheduleToggle.setAttribute('aria-checked',String(energyLimitedSchedule));scheduleToggle.disabled=energyExcludeCups;}
+  document.getElementById('energyCupToggle')?.setAttribute('aria-checked',String(energyExcludeCups));
   if(matchCountBadge)matchCountBadge.textContent=`${scheduleMatchCount} matches`;
   document.querySelectorAll('.energy-training-option').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.intensity===energyTrainingIntensity)));
   const trainingDescription=document.getElementById('energyTrainingDescription');

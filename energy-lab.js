@@ -39,7 +39,7 @@
         energies = energies.map((energy, index) => applyTraining(energy, players[index].trainingIntensity));
       }
       const afterTraining = energies.slice();
-      const matchTypes = ['league', 'cup'].filter(type => scheduleDay[type]);
+      const matchTypes = ['cup', 'league'].filter(type => scheduleDay[type]);
       const matches = [];
 
       matchTypes.forEach((type, matchIndex) => {
@@ -349,7 +349,7 @@
     const possibleStarts = matchCount * state.players.length;
     const fields = [
       ['Players', state.players.length, 'one shared chart'],
-      ['Season matches', matchCount, matchCount === 28 ? '28-match schedule' : 'full schedule'],
+      ['Season matches', matchCount, `${matchCount}-match schedule`],
       ['Total games played', gamesPlayed, `${possibleStarts} possible player starts`],
       ['Auto-rests', rests, 'threshold decisions'],
     ];
@@ -400,8 +400,8 @@
   function scheduleLabel(day) {
     const events = [];
     if (day.training) events.push('Training');
-    if (day.league) events.push('League');
     if (day.cup) events.push('Cup');
+    if (day.league) events.push('League');
     return events.length ? events.join(' · ') : 'Recovery day';
   }
 
