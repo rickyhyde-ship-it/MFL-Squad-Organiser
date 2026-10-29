@@ -34,3 +34,13 @@ test('training precedes cup and league in both projections', () => {
   assert.deepEqual(Array.from(projected.rows[0].matchStarts, m=>[m.type,m.energies[0]]), [['cup',10000+400],['league',9400]]);
 });
 
+test('cup switch updates the active schedule and saves its choice', () => {
+  let saved;
+  context.localStorage.setItem = (key, value) => { saved = [key, value]; };
+  context.toggleEnergyCups();
+  assert.deepEqual(saved, ['mfl_energy_exclude_cups', '1']);
+  assert.equal(context.activeEnergySchedule().filter(day => day.cup).length, 0);
+  context.toggleEnergyCups();
+  assert.deepEqual(saved, ['mfl_energy_exclude_cups', '0']);
+  assert.equal(context.activeEnergySchedule().filter(day => day.cup).length, 10);
+});

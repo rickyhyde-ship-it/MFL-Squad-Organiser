@@ -29,7 +29,7 @@ function harness(storage = new Map(), reject = () => false) {
     },
   });
   vm.runInContext(`
-    let squadStorageKey=null, squads=[], allPlayers=[], activeSquadId=null;
+    let squadStorageKey=null, squadIndexedDBActive=false, squadPersistenceQueue=Promise.resolve(), squads=[], allPlayers=[], activeSquadId=null;
     let collapsedDivisions=new Set(), clubsInitialized=false, viewerMode=false, careerScanWallet='';
     function buildSquadPlayerCache(){return [{id:'1',name:'Player One'}];}
     async function fetchOwnedClubs(){return [];}

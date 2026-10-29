@@ -43,7 +43,7 @@ function harness(fetch = async () => { throw new Error('Unexpected request'); })
 function responses(first, second, calls = []) {
   return async (url, options) => {
     calls.push({ url, profiles: JSON.parse(options.body).profiles, signal: options.signal });
-    const value = url.includes('jul-aug-2026') ? second : first;
+    const value = url.includes('energy-archive.') ? second : first;
     if (value instanceof Error) throw value;
     return { ok: true, json: async () => value };
   };
@@ -225,7 +225,7 @@ test('rest restores 65% of missing raw energy instead of draining, including at 
 test('rest recovery falls to 55% for orange and 35% for red retirement notices', () => {
   const { context } = harness();
   const schedule = [{ day: 1, training: false, league: true, cup: true }];
-  const restMatches = { '1:cup': true };
+  const restMatches = { '1:league': true };
   const projection = context.calculateEnergyProjection([
     { drain: 20, manualDrain: true, restMatches },
     { drain: 20, manualDrain: true, retirementYears: 3, restMatches },
@@ -241,8 +241,8 @@ test('D7 and D9 support play/play, rest/play, play/rest and rest/rest in sequenc
   const { context } = harness();
   const combinations = [
     { league: false, cup: false, secondStart: 6400, end: 4400 },
-    { league: true, cup: false, secondStart: 9440, end: 7440 },
-    { league: false, cup: true, secondStart: 6400, end: 8740 },
+    { league: false, cup: true, secondStart: 9440, end: 7440 },
+    { league: true, cup: false, secondStart: 6400, end: 8740 },
     { league: true, cup: true, secondStart: 9440, end: 9804 },
   ];
   for (const day of [7, 9]) {
@@ -259,8 +259,8 @@ test('D7 and D9 support play/play, rest/play, play/rest and rest/rest in sequenc
       ], schedule);
       const row = projection.rows[1];
       assert.equal(row.afterTraining[0], 8400);
-      assert.equal(row.matchStarts[0].type, 'league');
-      assert.equal(row.matchStarts[1].type, 'cup');
+      assert.equal(row.matchStarts[0].type, 'cup');
+      assert.equal(row.matchStarts[1].type, 'league');
       assert.equal(row.matchStarts[0].energies[0], 8400);
       assert.equal(row.matchStarts[1].energies[0], choice.secondStart);
       assert.equal(row.end[0], choice.end);
@@ -311,8 +311,8 @@ test('cup rests remain tied to the cup on cup-only days and across schedule mode
     assert.equal(cupOnly.type, 'cup');
     assert.equal(cupOnly.resting[0], true);
     const double = projection.rows.find(row => row.scheduleDay.day === 7).matchStarts;
-    assert.equal(double[0].resting[0], false);
-    assert.equal(double[1].resting[0], true);
+    assert.equal(double[0].resting[0], true);
+    assert.equal(double[1].resting[0], false);
   }
 });
 
@@ -385,7 +385,7 @@ test('daily team low training overrides individual settings once before games an
   const { context } = harness();
   const starters = ['medium', 'high'].map(trainingIntensity => ({
     drain: 20, manualDrain: true, trainingIntensity,
-    lowTrainingDays: { 2: true, 4: true }, restMatches: { '2:league': true },
+    lowTrainingDays: { 2: true, 4: true }, restMatches: { '2:cup': true },
   }));
   const schedule = [
     { day: 1, training: false, league: true },
@@ -420,7 +420,6 @@ test('daily low training toggles persist per squad without changing usual settin
   assert.deepEqual(saved.energyLowTrainingDays, { 15: true });
   assert.equal(saved.energyTrainingIntensities['player:1'], 'high');
   assert.equal(saved.energyRests['player:1']['7:cup'], true);
-  context.toggleEnergyTeamLowTraining(1);
   context.toggleEnergyTeamLowTraining(99);
   read('viewerMode=true');
   context.toggleEnergyTeamLowTraining(15);
@@ -493,7 +492,7 @@ test('each intensity trains once before double matches, supports rest, and skips
     high: { before: 7700, recovered: 9195, end: 7195 },
   };
   for (const [intensity, values] of Object.entries(expected)) {
-    const projection = context.calculateEnergyProjection([{ drain: 20, manualDrain: true, restMatches: { '7:league': true } }], schedule, intensity);
+    const projection = context.calculateEnergyProjection([{ drain: 20, manualDrain: true, restMatches: { '7:cup': true } }], schedule, intensity);
     assert.equal(projection.rows[0].afterTraining[0], 10000);
     assert.equal(projection.rows[1].afterTraining[0], values.before);
     assert.equal(projection.rows[1].matchStarts[1].energies[0], values.recovered);
@@ -520,11 +519,11 @@ test('training selection persists and invalid or missing values fall back to Low
   assert.equal(read('renderCount'), 2);
 });
 
-test('saved low counts remain compatible and all six training/schedule counts stay separate', () => {
+test('season 18 counts are isolated and all training/schedule counts stay separate', () => {
   const { context, read, storage } = harness();
   context.document = { getElementById: () => ({ querySelectorAll: () => [], querySelector: () => null }) };
   context.cacheEnergyModel({ ...model([]), complete: true, missingSources: [] });
-  storage.set('mfl_energy_projection_counts_v2_wallet', JSON.stringify({ full: { [profile.key]: 4 }, limited: { [profile.key]: 1 } }));
+  storage.set('mfl_energy_projection_counts_v3_wallet', JSON.stringify({ full: { [profile.key]: 4 }, limited: { [profile.key]: 1 }, noCup: {} }));
   context.loadEnergyProjectionCounts();
   assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'low'), 4);
   assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'medium'), null);
@@ -539,6 +538,11 @@ test('saved low counts remain compatible and all six training/schedule counts st
       assert.equal(context.storedEnergyProjectionCount(profile.key), count);
     }
   }
+  for (const intensity of ['low', 'medium', 'high']) {
+    read(`energyExcludeCups=true;energyTrainingIntensity='${intensity}';`);
+    context.updatePitchEnergyWarnings([{index: 0, modelKey: profile.key}], {rows: [{matchStarts: []}]});
+  }
+  read('energyExcludeCups=false');
   context.loadEnergyProjectionCounts();
   assert.equal(context.energyPoolReadyCount([profile]), 1);
   assert.equal(context.storedEnergyProjectionCount(profile.key, false, 'low'), 4);
