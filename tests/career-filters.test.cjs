@@ -16,18 +16,29 @@ function harness(nextSeason = false) {
   return context.matchesCareerFilters;
 }
 const player = (seasons, progression = 0) => ({ seasonsInGame: seasons, careerProgression: { overall: progression } });
-test('checkboxes alone select first season, second season, or both', () => {
+test('checkboxes alone select any combination of the first three seasons', () => {
   const match = harness();
-  for (const [first, second, expected] of [[false,false,[1,2,3]], [true,false,[1]], [false,true,[2]], [true,true,[1,2]]]) {
-    assert.deepEqual([1,2,3].filter(season => match(player(season),null,null,null,null,first,second)), expected);
+  const cases = [
+    [false, false, false, [1, 2, 3, 4]],
+    [true, false, false, [1]],
+    [false, true, false, [2]],
+    [false, false, true, [3]],
+    [true, true, false, [1, 2]],
+    [true, false, true, [1, 3]],
+    [false, true, true, [2, 3]],
+    [true, true, true, [1, 2, 3]],
+  ];
+  for (const [first, second, third, expected] of cases) {
+    assert.deepEqual([1, 2, 3, 4].filter(season => match(player(season),null,null,null,null,first,second,third)), expected);
   }
 });
 test('selected seasons are added to season and progression range matches', () => {
   const match = harness();
-  const cases = [[3,5,null,null], [null,null,4,8], [3,5,4,8]];
+  const cases = [[4,5,null,null], [null,null,4,8], [4,5,4,8]];
   for (const ranges of cases) {
     assert.equal(match(player(1,0),...ranges,true,false), true);
     assert.equal(match(player(2,0),...ranges,false,true), true);
+    assert.equal(match(player(3,0),...ranges,false,false,true), true);
     assert.equal(match(player(4,6),...ranges,true,true), true);
     assert.equal(match(player(6,9),...ranges,true,true), false);
   }
@@ -47,8 +58,10 @@ test('checkboxes use displayed next-season projection', () => {
   assert.equal(match(player(1),null,null,null,null,true,false), false);
   assert.equal(match(player(1),null,null,null,null,false,true), true);
   assert.equal(match(player(2),null,null,null,null,false,true), false);
+  assert.equal(match(player(2),null,null,null,null,false,false,true), true);
+  assert.equal(match(player(3),null,null,null,null,false,false,true), false);
 });
-test('clear all filters resets both season checkboxes', () => {
+test('clear all filters resets all season checkboxes', () => {
   const elements = {};
   let applied = false;
   const context = vm.createContext({ document: {getElementById: id => elements[id] ||= {checked:true,value:'5'}}, ALT_UPGRADE_DEFAULT_THRESHOLD:95, updateUpgradeFilterButton(){}, applyFilters(){applied=true;} });
@@ -56,6 +69,7 @@ test('clear all filters resets both season checkboxes', () => {
   context.clearPlayerFilters();
   assert.equal(elements.filterFirstSeason.checked,false);
   assert.equal(elements.filterSecondSeason.checked,false);
+  assert.equal(elements.filterThirdSeason.checked,false);
   assert.equal(applied,true);
 });
 test('both published HTML entry points stay identical', () => {
