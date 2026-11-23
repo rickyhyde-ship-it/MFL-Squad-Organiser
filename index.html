@@ -180,7 +180,8 @@ body {
 .squad-player-entry .sp-name { flex: 1; }
 .squad-player-entry .sp-pos { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
 .squad-player-entry.loan-entry { color: var(--loan-accent); }
-.squad-avg-row { display:flex; gap:16px; padding:8px 8px 10px; border-bottom:1px solid var(--border); margin-bottom:2px; }
+.squad-avg-row { display:flex; gap:16px; margin-inline:auto; white-space:nowrap; }
+.squad-avg-row:empty { display:none; }
 .squad-avg-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
 .squad-avg-label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
 .squad-avg-val { font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; }
@@ -1136,6 +1137,7 @@ body::after {
 
 .squad-header {
   position: relative;
+  flex-wrap: wrap;
   min-height: 62px;
   margin-bottom: 14px;
   padding: 8px 10px 10px 14px;
@@ -1167,8 +1169,9 @@ body::after {
 }
 
 .squad-name-wrap {
-  flex: 1 1 auto;
+  flex: 1 1 520px;
   min-width: 0;
+  max-width: 660px;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -1571,10 +1574,6 @@ button.substitute-card:not(.is-filled):focus-visible {
   background: rgba(6,17,26,.72);
 }
 
-.squad-avg-row {
-  border-bottom-color: rgba(151,178,199,.15);
-}
-
 .squad-player-entry {
   min-height: 44px;
   border: 1px solid transparent;
@@ -1778,7 +1777,9 @@ button.substitute-card:not(.is-filled):focus-visible {
   }
 
   .squad-name-wrap {
+    flex-basis: auto;
     width: 100%;
+    max-width: none;
     flex-wrap: wrap;
   }
 
@@ -2545,6 +2546,7 @@ button.substitute-card:not(.is-filled):focus-visible {
       <div id="squadContent" style="display:none">
         <div class="squad-header">
           <div class="squad-name-wrap"><input class="squad-name-input" id="squadNameInput" placeholder="Squad Name" maxlength="40"><div class="squad-header-metrics" role="status" aria-live="polite"><span class="squad-size-counter" id="squadSizeCounter">0 / 25</span><span class="squad-header-min-ovr" id="squadMinOvr">NO MIN OVR</span><span class="squad-header-under-count" id="squadUnderCount">0 / 5 UNDER</span></div></div>
+          <div class="squad-avg-row" id="squadAverages" role="group" aria-label="Squad average ratings"></div>
           <div class="squad-actions">
             <button type="button" class="season-toggle" id="nextSeasonToggle" aria-pressed="false" onclick="toggleNextSeason()" title="Hide red retirements and advance retirement warnings by one season"><span class="season-toggle-dot" aria-hidden="true"></span><span>Next Season</span></button>
             <button class="btn btn-accent" onclick="openAddPlayerModal('starters')">Add Player</button>
@@ -4730,16 +4732,19 @@ function renderSquadPlayerList(){
   const top16Avg=avg(ovrs.slice(0,16));
   const allAvg=avg(ovrs);
 
+  const averages = [
+    ['Top 11', top11Avg],
+    ['Top 16', ovrs.length > 11 ? top16Avg : null],
+    [`All ${ovrs.length}`, allAvg]
+  ];
+  document.getElementById('squadAverages').innerHTML = averages
+    .filter(([, value]) => value !== null)
+    .map(([label, value]) => {
+      const rating = Math.round(value);
+      return `<div class="squad-avg-item"><span class="squad-avg-label">${label}</span><span class="squad-avg-val" style="color:${getOvrColor(rating)}">${rating}</span></div>`;
+    }).join('');
+
   let h=`<div class="squad-player-list-title">Squad Players${viewerMode?' — live player positions, OVRs and stats':' — click name to copy surname'}</div>`;
-
-  if(ovrs.length>0){
-    h+='<div class="squad-avg-row">';
-    if(top11Avg!==null)h+=`<div class="squad-avg-item"><span class="squad-avg-label">Top 11</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(top11Avg))}">${Math.round(top11Avg)}</span></div>`;
-    if(top16Avg!==null&&ovrs.length>11)h+=`<div class="squad-avg-item"><span class="squad-avg-label">Top 16</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(top16Avg))}">${Math.round(top16Avg)}</span></div>`;
-    if(allAvg!==null)h+=`<div class="squad-avg-item"><span class="squad-avg-label">All ${ovrs.length}</span><span class="squad-avg-val" style="color:${getOvrColor(Math.round(allAvg))}">${Math.round(allAvg)}</span></div>`;
-    h+='</div>';
-  }
-
   const groups=squadSlotGroups(sq);
   [{key:'starters',label:'Starters'},{key:'backups',label:'Backups'},{key:'substitutes',label:'Substitutes'}].forEach(({key,label})=>{
     const sectionGroups=groups.filter(group=>group.section===key);if(!sectionGroups.length)return;
