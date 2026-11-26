@@ -12,7 +12,7 @@
   }
 
   function emptyCache() {
-    return { version: CACHE_VERSION, updatedAt: null, seasons: {}, failures: [] };
+    return { version: CACHE_VERSION, updatedAt: null, seasons: {}, failures: [], refreshPending: [] };
   }
 
   function load(wallet) {
@@ -29,6 +29,7 @@
           return Number.isFinite(number) && number >= 1 ? [[String(id), Math.round(number)]] : [];
         })),
         failures: Array.from(new Set((Array.isArray(parsed.failures) ? parsed.failures : []).map(String).filter(Boolean))),
+        refreshPending: Array.from(new Set((Array.isArray(parsed.refreshPending) ? parsed.refreshPending : []).map(String).filter(Boolean))),
       };
     } catch (error) {
       return emptyCache();
@@ -44,6 +45,7 @@
         updatedAt: Date.now(),
         seasons: cache.seasons || {},
         failures: Array.isArray(cache.failures) ? cache.failures : [],
+        refreshPending: Array.isArray(cache.refreshPending) ? cache.refreshPending : [],
       }));
     } catch (error) {}
   }
@@ -77,6 +79,18 @@
     return (Array.isArray(cache.failures) ? cache.failures : []).reduce((count, id) => count + (playerIds.has(String(id)) ? 1 : 0), 0);
   }
 
+  function remainingPlayers(players, cache) {
+    const refreshPending = new Set(cache.refreshPending);
+    return players.filter((player) => {
+      const id = String(player.id);
+      return refreshPending.has(id) || !Object.prototype.hasOwnProperty.call(cache.seasons, id);
+    });
+  }
+
+  function countRemaining(players, cache) {
+    return remainingPlayers(players, cache).length;
+  }
+
   async function scan(options) {
     const wallet = normalizeWallet(options.wallet);
     if (!wallet) throw new Error("A valid wallet address is required for the season scan.");
@@ -90,7 +104,12 @@
       ? uniquePlayers.filter((player) => failedIds.has(String(player.id)))
       : options.force
         ? uniquePlayers
-        : uniquePlayers.filter((player) => !Object.prototype.hasOwnProperty.call(cache.seasons, String(player.id)));
+        : remainingPlayers(uniquePlayers, cache);
+    if (options.force && !options.retryFailed) {
+      cache.refreshPending = queue.map((player) => String(player.id));
+      save(wallet, cache);
+    }
+    const refreshPending = new Set(cache.refreshPending);
     const total = queue.length;
     const startedAt = Date.now();
     let completed = 0;
@@ -156,6 +175,7 @@
         failedIds.add(String(player.id));
       }
       cache.failures = Array.from(failedIds);
+      if (refreshPending.delete(String(player.id))) cache.refreshPending = Array.from(refreshPending);
       completed += 1;
       if (completed % 5 === 0) save(wallet, cache);
       report({ playerId: String(player.id), seasons });
@@ -174,6 +194,7 @@
     calculate,
     countCached,
     countFailed,
+    countRemaining,
     scan,
   });
 })(window);
